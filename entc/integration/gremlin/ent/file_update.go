@@ -102,6 +102,26 @@ func (fu *FileUpdate) ClearGroup() *FileUpdate {
 	return fu
 }
 
+// SetOp sets the op field.
+func (fu *FileUpdate) SetOp(b bool) *FileUpdate {
+	fu.mutation.SetOp(b)
+	return fu
+}
+
+// SetNillableOp sets the op field if the given value is not nil.
+func (fu *FileUpdate) SetNillableOp(b *bool) *FileUpdate {
+	if b != nil {
+		fu.SetOp(*b)
+	}
+	return fu
+}
+
+// ClearOp clears the value of op.
+func (fu *FileUpdate) ClearOp() *FileUpdate {
+	fu.mutation.ClearOp()
+	return fu
+}
+
 // SetOwnerID sets the owner edge to User by id.
 func (fu *FileUpdate) SetOwnerID(id string) *FileUpdate {
 	fu.mutation.SetOwnerID(id)
@@ -160,15 +180,21 @@ func (fu *FileUpdate) Mutation() *FileMutation {
 	return fu.mutation
 }
 
-// ClearOwner clears the owner edge to User.
+// ClearOwner clears the "owner" edge to type User.
 func (fu *FileUpdate) ClearOwner() *FileUpdate {
 	fu.mutation.ClearOwner()
 	return fu
 }
 
-// ClearType clears the type edge to FileType.
+// ClearType clears the "type" edge to type FileType.
 func (fu *FileUpdate) ClearType() *FileUpdate {
 	fu.mutation.ClearType()
+	return fu
+}
+
+// ClearFieldEdge clears all "field" edges to type FieldType.
+func (fu *FileUpdate) ClearFieldEdge() *FileUpdate {
+	fu.mutation.ClearFieldEdge()
 	return fu
 }
 
@@ -189,23 +215,23 @@ func (fu *FileUpdate) RemoveField(f ...*FieldType) *FileUpdate {
 
 // Save executes the query and returns the number of rows/vertices matched by this operation.
 func (fu *FileUpdate) Save(ctx context.Context) (int, error) {
-	if v, ok := fu.mutation.Size(); ok {
-		if err := file.SizeValidator(v); err != nil {
-			return 0, &ValidationError{Name: "size", err: fmt.Errorf("ent: validator failed for field \"size\": %w", err)}
-		}
-	}
-
 	var (
 		err      error
 		affected int
 	)
 	if len(fu.hooks) == 0 {
+		if err = fu.check(); err != nil {
+			return 0, err
+		}
 		affected, err = fu.gremlinSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*FileMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = fu.check(); err != nil {
+				return 0, err
 			}
 			fu.mutation = mutation
 			affected, err = fu.gremlinSave(ctx)
@@ -242,6 +268,16 @@ func (fu *FileUpdate) ExecX(ctx context.Context) {
 	if err := fu.Exec(ctx); err != nil {
 		panic(err)
 	}
+}
+
+// check runs all checks and user-defined validators on the builder.
+func (fu *FileUpdate) check() error {
+	if v, ok := fu.mutation.Size(); ok {
+		if err := file.SizeValidator(v); err != nil {
+			return &ValidationError{Name: "size", err: fmt.Errorf("ent: validator failed for field \"size\": %w", err)}
+		}
+	}
+	return nil
 }
 
 func (fu *FileUpdate) gremlinSave(ctx context.Context) (int, error) {
@@ -287,12 +323,18 @@ func (fu *FileUpdate) gremlin() *dsl.Traversal {
 	if value, ok := fu.mutation.Group(); ok {
 		v.Property(dsl.Single, file.FieldGroup, value)
 	}
+	if value, ok := fu.mutation.GetOp(); ok {
+		v.Property(dsl.Single, file.FieldOp, value)
+	}
 	var properties []interface{}
 	if fu.mutation.UserCleared() {
 		properties = append(properties, file.FieldUser)
 	}
 	if fu.mutation.GroupCleared() {
 		properties = append(properties, file.FieldGroup)
+	}
+	if fu.mutation.OpCleared() {
+		properties = append(properties, file.FieldOp)
 	}
 	if len(properties) > 0 {
 		v.SideEffect(__.Properties(properties...).Drop())
@@ -411,6 +453,26 @@ func (fuo *FileUpdateOne) ClearGroup() *FileUpdateOne {
 	return fuo
 }
 
+// SetOp sets the op field.
+func (fuo *FileUpdateOne) SetOp(b bool) *FileUpdateOne {
+	fuo.mutation.SetOp(b)
+	return fuo
+}
+
+// SetNillableOp sets the op field if the given value is not nil.
+func (fuo *FileUpdateOne) SetNillableOp(b *bool) *FileUpdateOne {
+	if b != nil {
+		fuo.SetOp(*b)
+	}
+	return fuo
+}
+
+// ClearOp clears the value of op.
+func (fuo *FileUpdateOne) ClearOp() *FileUpdateOne {
+	fuo.mutation.ClearOp()
+	return fuo
+}
+
 // SetOwnerID sets the owner edge to User by id.
 func (fuo *FileUpdateOne) SetOwnerID(id string) *FileUpdateOne {
 	fuo.mutation.SetOwnerID(id)
@@ -469,15 +531,21 @@ func (fuo *FileUpdateOne) Mutation() *FileMutation {
 	return fuo.mutation
 }
 
-// ClearOwner clears the owner edge to User.
+// ClearOwner clears the "owner" edge to type User.
 func (fuo *FileUpdateOne) ClearOwner() *FileUpdateOne {
 	fuo.mutation.ClearOwner()
 	return fuo
 }
 
-// ClearType clears the type edge to FileType.
+// ClearType clears the "type" edge to type FileType.
 func (fuo *FileUpdateOne) ClearType() *FileUpdateOne {
 	fuo.mutation.ClearType()
+	return fuo
+}
+
+// ClearFieldEdge clears all "field" edges to type FieldType.
+func (fuo *FileUpdateOne) ClearFieldEdge() *FileUpdateOne {
+	fuo.mutation.ClearFieldEdge()
 	return fuo
 }
 
@@ -498,23 +566,23 @@ func (fuo *FileUpdateOne) RemoveField(f ...*FieldType) *FileUpdateOne {
 
 // Save executes the query and returns the updated entity.
 func (fuo *FileUpdateOne) Save(ctx context.Context) (*File, error) {
-	if v, ok := fuo.mutation.Size(); ok {
-		if err := file.SizeValidator(v); err != nil {
-			return nil, &ValidationError{Name: "size", err: fmt.Errorf("ent: validator failed for field \"size\": %w", err)}
-		}
-	}
-
 	var (
 		err  error
 		node *File
 	)
 	if len(fuo.hooks) == 0 {
+		if err = fuo.check(); err != nil {
+			return nil, err
+		}
 		node, err = fuo.gremlinSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*FileMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = fuo.check(); err != nil {
+				return nil, err
 			}
 			fuo.mutation = mutation
 			node, err = fuo.gremlinSave(ctx)
@@ -533,11 +601,11 @@ func (fuo *FileUpdateOne) Save(ctx context.Context) (*File, error) {
 
 // SaveX is like Save, but panics if an error occurs.
 func (fuo *FileUpdateOne) SaveX(ctx context.Context) *File {
-	f, err := fuo.Save(ctx)
+	node, err := fuo.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return f
+	return node
 }
 
 // Exec executes the query on the entity.
@@ -551,6 +619,16 @@ func (fuo *FileUpdateOne) ExecX(ctx context.Context) {
 	if err := fuo.Exec(ctx); err != nil {
 		panic(err)
 	}
+}
+
+// check runs all checks and user-defined validators on the builder.
+func (fuo *FileUpdateOne) check() error {
+	if v, ok := fuo.mutation.Size(); ok {
+		if err := file.SizeValidator(v); err != nil {
+			return &ValidationError{Name: "size", err: fmt.Errorf("ent: validator failed for field \"size\": %w", err)}
+		}
+	}
+	return nil
 }
 
 func (fuo *FileUpdateOne) gremlinSave(ctx context.Context) (*File, error) {
@@ -601,12 +679,18 @@ func (fuo *FileUpdateOne) gremlin(id string) *dsl.Traversal {
 	if value, ok := fuo.mutation.Group(); ok {
 		v.Property(dsl.Single, file.FieldGroup, value)
 	}
+	if value, ok := fuo.mutation.GetOp(); ok {
+		v.Property(dsl.Single, file.FieldOp, value)
+	}
 	var properties []interface{}
 	if fuo.mutation.UserCleared() {
 		properties = append(properties, file.FieldUser)
 	}
 	if fuo.mutation.GroupCleared() {
 		properties = append(properties, file.FieldGroup)
+	}
+	if fuo.mutation.OpCleared() {
+		properties = append(properties, file.FieldOp)
 	}
 	if len(properties) > 0 {
 		v.SideEffect(__.Properties(properties...).Drop())

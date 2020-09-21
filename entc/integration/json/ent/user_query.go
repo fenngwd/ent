@@ -58,23 +58,23 @@ func (uq *UserQuery) Order(o ...OrderFunc) *UserQuery {
 
 // First returns the first User entity in the query. Returns *NotFoundError when no user was found.
 func (uq *UserQuery) First(ctx context.Context) (*User, error) {
-	us, err := uq.Limit(1).All(ctx)
+	nodes, err := uq.Limit(1).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(us) == 0 {
+	if len(nodes) == 0 {
 		return nil, &NotFoundError{user.Label}
 	}
-	return us[0], nil
+	return nodes[0], nil
 }
 
 // FirstX is like First, but panics if an error occurs.
 func (uq *UserQuery) FirstX(ctx context.Context) *User {
-	u, err := uq.First(ctx)
+	node, err := uq.First(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
 	}
-	return u
+	return node
 }
 
 // FirstID returns the first User id in the query. Returns *NotFoundError when no id was found.
@@ -101,13 +101,13 @@ func (uq *UserQuery) FirstXID(ctx context.Context) int {
 
 // Only returns the only User entity in the query, returns an error if not exactly one entity was returned.
 func (uq *UserQuery) Only(ctx context.Context) (*User, error) {
-	us, err := uq.Limit(2).All(ctx)
+	nodes, err := uq.Limit(2).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	switch len(us) {
+	switch len(nodes) {
 	case 1:
-		return us[0], nil
+		return nodes[0], nil
 	case 0:
 		return nil, &NotFoundError{user.Label}
 	default:
@@ -117,11 +117,11 @@ func (uq *UserQuery) Only(ctx context.Context) (*User, error) {
 
 // OnlyX is like Only, but panics if an error occurs.
 func (uq *UserQuery) OnlyX(ctx context.Context) *User {
-	u, err := uq.Only(ctx)
+	node, err := uq.Only(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return u
+	return node
 }
 
 // OnlyID returns the only User id in the query, returns an error if not exactly one id was returned.
@@ -160,11 +160,11 @@ func (uq *UserQuery) All(ctx context.Context) ([]*User, error) {
 
 // AllX is like All, but panics if an error occurs.
 func (uq *UserQuery) AllX(ctx context.Context) []*User {
-	us, err := uq.All(ctx)
+	nodes, err := uq.All(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return us
+	return nodes
 }
 
 // IDs executes the query and returns a list of User ids.
@@ -241,12 +241,12 @@ func (uq *UserQuery) Clone() *UserQuery {
 // Example:
 //
 //	var v []struct {
-//		URL *url.URL `json:"url,omitempty"`
+//		T *schema.T `json:"t,omitempty"`
 //		Count int `json:"count,omitempty"`
 //	}
 //
 //	client.User.Query().
-//		GroupBy(user.FieldURL).
+//		GroupBy(user.FieldT).
 //		Aggregate(ent.Count()).
 //		Scan(ctx, &v)
 //
@@ -267,11 +267,11 @@ func (uq *UserQuery) GroupBy(field string, fields ...string) *UserGroupBy {
 // Example:
 //
 //	var v []struct {
-//		URL *url.URL `json:"url,omitempty"`
+//		T *schema.T `json:"t,omitempty"`
 //	}
 //
 //	client.User.Query().
-//		Select(user.FieldURL).
+//		Select(user.FieldT).
 //		Scan(ctx, &v)
 //
 func (uq *UserQuery) Select(field string, fields ...string) *UserSelect {
@@ -366,7 +366,7 @@ func (uq *UserQuery) querySpec() *sqlgraph.QuerySpec {
 	if ps := uq.order; len(ps) > 0 {
 		_spec.Order = func(selector *sql.Selector) {
 			for i := range ps {
-				ps[i](selector)
+				ps[i](selector, user.ValidColumn)
 			}
 		}
 	}
@@ -385,7 +385,7 @@ func (uq *UserQuery) sqlQuery() *sql.Selector {
 		p(selector)
 	}
 	for _, p := range uq.order {
-		p(selector)
+		p(selector, user.ValidColumn)
 	}
 	if offset := uq.offset; offset != nil {
 		// limit is mandatory for offset clause. We start
@@ -620,8 +620,17 @@ func (ugb *UserGroupBy) BoolX(ctx context.Context) bool {
 }
 
 func (ugb *UserGroupBy) sqlScan(ctx context.Context, v interface{}) error {
+	for _, f := range ugb.fields {
+		if !user.ValidColumn(f) {
+			return &ValidationError{Name: f, err: fmt.Errorf("invalid field %q for group-by", f)}
+		}
+	}
+	selector := ugb.sqlQuery()
+	if err := selector.Err(); err != nil {
+		return err
+	}
 	rows := &sql.Rows{}
-	query, args := ugb.sqlQuery().Query()
+	query, args := selector.Query()
 	if err := ugb.driver.Query(ctx, query, args, rows); err != nil {
 		return err
 	}
@@ -634,7 +643,7 @@ func (ugb *UserGroupBy) sqlQuery() *sql.Selector {
 	columns := make([]string, 0, len(ugb.fields)+len(ugb.fns))
 	columns = append(columns, ugb.fields...)
 	for _, fn := range ugb.fns {
-		columns = append(columns, fn(selector))
+		columns = append(columns, fn(selector, user.ValidColumn))
 	}
 	return selector.Select(columns...).GroupBy(ugb.fields...)
 }
@@ -854,6 +863,11 @@ func (us *UserSelect) BoolX(ctx context.Context) bool {
 }
 
 func (us *UserSelect) sqlScan(ctx context.Context, v interface{}) error {
+	for _, f := range us.fields {
+		if !user.ValidColumn(f) {
+			return &ValidationError{Name: f, err: fmt.Errorf("invalid field %q for selection", f)}
+		}
+	}
 	rows := &sql.Rows{}
 	query, args := us.sqlQuery().Query()
 	if err := us.driver.Query(ctx, query, args, rows); err != nil {

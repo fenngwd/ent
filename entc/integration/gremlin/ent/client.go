@@ -17,12 +17,14 @@ import (
 	"github.com/facebook/ent/entc/integration/gremlin/ent/fieldtype"
 	"github.com/facebook/ent/entc/integration/gremlin/ent/file"
 	"github.com/facebook/ent/entc/integration/gremlin/ent/filetype"
+	"github.com/facebook/ent/entc/integration/gremlin/ent/goods"
 	"github.com/facebook/ent/entc/integration/gremlin/ent/group"
 	"github.com/facebook/ent/entc/integration/gremlin/ent/groupinfo"
 	"github.com/facebook/ent/entc/integration/gremlin/ent/item"
 	"github.com/facebook/ent/entc/integration/gremlin/ent/node"
 	"github.com/facebook/ent/entc/integration/gremlin/ent/pet"
 	"github.com/facebook/ent/entc/integration/gremlin/ent/spec"
+	"github.com/facebook/ent/entc/integration/gremlin/ent/task"
 	"github.com/facebook/ent/entc/integration/gremlin/ent/user"
 
 	"github.com/facebook/ent/dialect"
@@ -44,6 +46,8 @@ type Client struct {
 	File *FileClient
 	// FileType is the client for interacting with the FileType builders.
 	FileType *FileTypeClient
+	// Goods is the client for interacting with the Goods builders.
+	Goods *GoodsClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
 	// GroupInfo is the client for interacting with the GroupInfo builders.
@@ -56,6 +60,8 @@ type Client struct {
 	Pet *PetClient
 	// Spec is the client for interacting with the Spec builders.
 	Spec *SpecClient
+	// Task is the client for interacting with the Task builders.
+	Task *TaskClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
 }
@@ -75,12 +81,14 @@ func (c *Client) init() {
 	c.FieldType = NewFieldTypeClient(c.config)
 	c.File = NewFileClient(c.config)
 	c.FileType = NewFileTypeClient(c.config)
+	c.Goods = NewGoodsClient(c.config)
 	c.Group = NewGroupClient(c.config)
 	c.GroupInfo = NewGroupInfoClient(c.config)
 	c.Item = NewItemClient(c.config)
 	c.Node = NewNodeClient(c.config)
 	c.Pet = NewPetClient(c.config)
 	c.Spec = NewSpecClient(c.config)
+	c.Task = NewTaskClient(c.config)
 	c.User = NewUserClient(c.config)
 }
 
@@ -128,12 +136,14 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		FieldType: NewFieldTypeClient(cfg),
 		File:      NewFileClient(cfg),
 		FileType:  NewFileTypeClient(cfg),
+		Goods:     NewGoodsClient(cfg),
 		Group:     NewGroupClient(cfg),
 		GroupInfo: NewGroupInfoClient(cfg),
 		Item:      NewItemClient(cfg),
 		Node:      NewNodeClient(cfg),
 		Pet:       NewPetClient(cfg),
 		Spec:      NewSpecClient(cfg),
+		Task:      NewTaskClient(cfg),
 		User:      NewUserClient(cfg),
 	}, nil
 }
@@ -168,12 +178,14 @@ func (c *Client) Use(hooks ...Hook) {
 	c.FieldType.Use(hooks...)
 	c.File.Use(hooks...)
 	c.FileType.Use(hooks...)
+	c.Goods.Use(hooks...)
 	c.Group.Use(hooks...)
 	c.GroupInfo.Use(hooks...)
 	c.Item.Use(hooks...)
 	c.Node.Use(hooks...)
 	c.Pet.Use(hooks...)
 	c.Spec.Use(hooks...)
+	c.Task.Use(hooks...)
 	c.User.Use(hooks...)
 }
 
@@ -253,11 +265,11 @@ func (c *CardClient) Get(ctx context.Context, id string) (*Card, error) {
 
 // GetX is like Get, but panics if an error occurs.
 func (c *CardClient) GetX(ctx context.Context, id string) *Card {
-	ca, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return ca
+	return obj
 }
 
 // QueryOwner queries the owner edge of a Card.
@@ -363,11 +375,11 @@ func (c *CommentClient) Get(ctx context.Context, id string) (*Comment, error) {
 
 // GetX is like Get, but panics if an error occurs.
 func (c *CommentClient) GetX(ctx context.Context, id string) *Comment {
-	co, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return co
+	return obj
 }
 
 // Hooks returns the client hooks.
@@ -451,11 +463,11 @@ func (c *FieldTypeClient) Get(ctx context.Context, id string) (*FieldType, error
 
 // GetX is like Get, but panics if an error occurs.
 func (c *FieldTypeClient) GetX(ctx context.Context, id string) *FieldType {
-	ft, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return ft
+	return obj
 }
 
 // Hooks returns the client hooks.
@@ -539,11 +551,11 @@ func (c *FileClient) Get(ctx context.Context, id string) (*File, error) {
 
 // GetX is like Get, but panics if an error occurs.
 func (c *FileClient) GetX(ctx context.Context, id string) *File {
-	f, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return f
+	return obj
 }
 
 // QueryOwner queries the owner edge of a File.
@@ -660,11 +672,11 @@ func (c *FileTypeClient) Get(ctx context.Context, id string) (*FileType, error) 
 
 // GetX is like Get, but panics if an error occurs.
 func (c *FileTypeClient) GetX(ctx context.Context, id string) *FileType {
-	ft, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return ft
+	return obj
 }
 
 // QueryFiles queries the files edge of a FileType.
@@ -681,6 +693,94 @@ func (c *FileTypeClient) QueryFiles(ft *FileType) *FileQuery {
 // Hooks returns the client hooks.
 func (c *FileTypeClient) Hooks() []Hook {
 	return c.hooks.FileType
+}
+
+// GoodsClient is a client for the Goods schema.
+type GoodsClient struct {
+	config
+}
+
+// NewGoodsClient returns a client for the Goods from the given config.
+func NewGoodsClient(c config) *GoodsClient {
+	return &GoodsClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `goods.Hooks(f(g(h())))`.
+func (c *GoodsClient) Use(hooks ...Hook) {
+	c.hooks.Goods = append(c.hooks.Goods, hooks...)
+}
+
+// Create returns a create builder for Goods.
+func (c *GoodsClient) Create() *GoodsCreate {
+	mutation := newGoodsMutation(c.config, OpCreate)
+	return &GoodsCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// BulkCreate returns a builder for creating a bulk of Goods entities.
+func (c *GoodsClient) CreateBulk(builders ...*GoodsCreate) *GoodsCreateBulk {
+	return &GoodsCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Goods.
+func (c *GoodsClient) Update() *GoodsUpdate {
+	mutation := newGoodsMutation(c.config, OpUpdate)
+	return &GoodsUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *GoodsClient) UpdateOne(_go *Goods) *GoodsUpdateOne {
+	mutation := newGoodsMutation(c.config, OpUpdateOne, withGoods(_go))
+	return &GoodsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *GoodsClient) UpdateOneID(id string) *GoodsUpdateOne {
+	mutation := newGoodsMutation(c.config, OpUpdateOne, withGoodsID(id))
+	return &GoodsUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Goods.
+func (c *GoodsClient) Delete() *GoodsDelete {
+	mutation := newGoodsMutation(c.config, OpDelete)
+	return &GoodsDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a delete builder for the given entity.
+func (c *GoodsClient) DeleteOne(_go *Goods) *GoodsDeleteOne {
+	return c.DeleteOneID(_go.ID)
+}
+
+// DeleteOneID returns a delete builder for the given id.
+func (c *GoodsClient) DeleteOneID(id string) *GoodsDeleteOne {
+	builder := c.Delete().Where(goods.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &GoodsDeleteOne{builder}
+}
+
+// Query returns a query builder for Goods.
+func (c *GoodsClient) Query() *GoodsQuery {
+	return &GoodsQuery{config: c.config}
+}
+
+// Get returns a Goods entity by its id.
+func (c *GoodsClient) Get(ctx context.Context, id string) (*Goods, error) {
+	return c.Query().Where(goods.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *GoodsClient) GetX(ctx context.Context, id string) *Goods {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *GoodsClient) Hooks() []Hook {
+	return c.hooks.Goods
 }
 
 // GroupClient is a client for the Group schema.
@@ -759,11 +859,11 @@ func (c *GroupClient) Get(ctx context.Context, id string) (*Group, error) {
 
 // GetX is like Get, but panics if an error occurs.
 func (c *GroupClient) GetX(ctx context.Context, id string) *Group {
-	gr, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return gr
+	return obj
 }
 
 // QueryFiles queries the files edge of a Group.
@@ -891,11 +991,11 @@ func (c *GroupInfoClient) Get(ctx context.Context, id string) (*GroupInfo, error
 
 // GetX is like Get, but panics if an error occurs.
 func (c *GroupInfoClient) GetX(ctx context.Context, id string) *GroupInfo {
-	gi, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return gi
+	return obj
 }
 
 // QueryGroups queries the groups edge of a GroupInfo.
@@ -990,11 +1090,11 @@ func (c *ItemClient) Get(ctx context.Context, id string) (*Item, error) {
 
 // GetX is like Get, but panics if an error occurs.
 func (c *ItemClient) GetX(ctx context.Context, id string) *Item {
-	i, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return i
+	return obj
 }
 
 // Hooks returns the client hooks.
@@ -1078,11 +1178,11 @@ func (c *NodeClient) Get(ctx context.Context, id string) (*Node, error) {
 
 // GetX is like Get, but panics if an error occurs.
 func (c *NodeClient) GetX(ctx context.Context, id string) *Node {
-	n, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return n
+	return obj
 }
 
 // QueryPrev queries the prev edge of a Node.
@@ -1188,11 +1288,11 @@ func (c *PetClient) Get(ctx context.Context, id string) (*Pet, error) {
 
 // GetX is like Get, but panics if an error occurs.
 func (c *PetClient) GetX(ctx context.Context, id string) *Pet {
-	pe, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return pe
+	return obj
 }
 
 // QueryTeam queries the team edge of a Pet.
@@ -1298,11 +1398,11 @@ func (c *SpecClient) Get(ctx context.Context, id string) (*Spec, error) {
 
 // GetX is like Get, but panics if an error occurs.
 func (c *SpecClient) GetX(ctx context.Context, id string) *Spec {
-	s, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return s
+	return obj
 }
 
 // QueryCard queries the card edge of a Spec.
@@ -1319,6 +1419,94 @@ func (c *SpecClient) QueryCard(s *Spec) *CardQuery {
 // Hooks returns the client hooks.
 func (c *SpecClient) Hooks() []Hook {
 	return c.hooks.Spec
+}
+
+// TaskClient is a client for the Task schema.
+type TaskClient struct {
+	config
+}
+
+// NewTaskClient returns a client for the Task from the given config.
+func NewTaskClient(c config) *TaskClient {
+	return &TaskClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `task.Hooks(f(g(h())))`.
+func (c *TaskClient) Use(hooks ...Hook) {
+	c.hooks.Task = append(c.hooks.Task, hooks...)
+}
+
+// Create returns a create builder for Task.
+func (c *TaskClient) Create() *TaskCreate {
+	mutation := newTaskMutation(c.config, OpCreate)
+	return &TaskCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// BulkCreate returns a builder for creating a bulk of Task entities.
+func (c *TaskClient) CreateBulk(builders ...*TaskCreate) *TaskCreateBulk {
+	return &TaskCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for Task.
+func (c *TaskClient) Update() *TaskUpdate {
+	mutation := newTaskMutation(c.config, OpUpdate)
+	return &TaskUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *TaskClient) UpdateOne(t *Task) *TaskUpdateOne {
+	mutation := newTaskMutation(c.config, OpUpdateOne, withTask(t))
+	return &TaskUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *TaskClient) UpdateOneID(id string) *TaskUpdateOne {
+	mutation := newTaskMutation(c.config, OpUpdateOne, withTaskID(id))
+	return &TaskUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for Task.
+func (c *TaskClient) Delete() *TaskDelete {
+	mutation := newTaskMutation(c.config, OpDelete)
+	return &TaskDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a delete builder for the given entity.
+func (c *TaskClient) DeleteOne(t *Task) *TaskDeleteOne {
+	return c.DeleteOneID(t.ID)
+}
+
+// DeleteOneID returns a delete builder for the given id.
+func (c *TaskClient) DeleteOneID(id string) *TaskDeleteOne {
+	builder := c.Delete().Where(task.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &TaskDeleteOne{builder}
+}
+
+// Query returns a query builder for Task.
+func (c *TaskClient) Query() *TaskQuery {
+	return &TaskQuery{config: c.config}
+}
+
+// Get returns a Task entity by its id.
+func (c *TaskClient) Get(ctx context.Context, id string) (*Task, error) {
+	return c.Query().Where(task.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *TaskClient) GetX(ctx context.Context, id string) *Task {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *TaskClient) Hooks() []Hook {
+	return c.hooks.Task
 }
 
 // UserClient is a client for the User schema.
@@ -1397,11 +1585,11 @@ func (c *UserClient) Get(ctx context.Context, id string) (*User, error) {
 
 // GetX is like Get, but panics if an error occurs.
 func (c *UserClient) GetX(ctx context.Context, id string) *User {
-	u, err := c.Get(ctx, id)
+	obj, err := c.Get(ctx, id)
 	if err != nil {
 		panic(err)
 	}
-	return u
+	return obj
 }
 
 // QueryCard queries the card edge of a User.

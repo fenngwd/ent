@@ -554,20 +554,24 @@ func (ftc *FieldTypeCreate) Mutation() *FieldTypeMutation {
 
 // Save creates the FieldType in the database.
 func (ftc *FieldTypeCreate) Save(ctx context.Context) (*FieldType, error) {
-	if err := ftc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *FieldType
 	)
+	ftc.defaults()
 	if len(ftc.hooks) == 0 {
+		if err = ftc.check(); err != nil {
+			return nil, err
+		}
 		node, err = ftc.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*FieldTypeMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = ftc.check(); err != nil {
+				return nil, err
 			}
 			ftc.mutation = mutation
 			node, err = ftc.sqlSave(ctx)
@@ -593,7 +597,16 @@ func (ftc *FieldTypeCreate) SaveX(ctx context.Context) *FieldType {
 	return v
 }
 
-func (ftc *FieldTypeCreate) preSave() error {
+// defaults sets the default values of the builder before save.
+func (ftc *FieldTypeCreate) defaults() {
+	if _, ok := ftc.mutation.Role(); !ok {
+		v := fieldtype.DefaultRole
+		ftc.mutation.SetRole(v)
+	}
+}
+
+// check runs all checks and user-defined validators on the builder.
+func (ftc *FieldTypeCreate) check() error {
 	if _, ok := ftc.mutation.Int(); !ok {
 		return &ValidationError{Name: "int", err: errors.New("ent: missing required field \"int\"")}
 	}
@@ -630,8 +643,7 @@ func (ftc *FieldTypeCreate) preSave() error {
 		}
 	}
 	if _, ok := ftc.mutation.Role(); !ok {
-		v := fieldtype.DefaultRole
-		ftc.mutation.SetRole(v)
+		return &ValidationError{Name: "role", err: errors.New("ent: missing required field \"role\"")}
 	}
 	if v, ok := ftc.mutation.Role(); ok {
 		if err := fieldtype.RoleValidator(v); err != nil {
@@ -642,7 +654,7 @@ func (ftc *FieldTypeCreate) preSave() error {
 }
 
 func (ftc *FieldTypeCreate) sqlSave(ctx context.Context) (*FieldType, error) {
-	ft, _spec := ftc.createSpec()
+	_node, _spec := ftc.createSpec()
 	if err := sqlgraph.CreateNode(ctx, ftc.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -650,13 +662,13 @@ func (ftc *FieldTypeCreate) sqlSave(ctx context.Context) (*FieldType, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	ft.ID = int(id)
-	return ft, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 	var (
-		ft    = &FieldType{config: ftc.config}
+		_node = &FieldType{config: ftc.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: fieldtype.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -671,7 +683,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldInt,
 		})
-		ft.Int = value
+		_node.Int = value
 	}
 	if value, ok := ftc.mutation.Int8(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -679,7 +691,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldInt8,
 		})
-		ft.Int8 = value
+		_node.Int8 = value
 	}
 	if value, ok := ftc.mutation.Int16(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -687,7 +699,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldInt16,
 		})
-		ft.Int16 = value
+		_node.Int16 = value
 	}
 	if value, ok := ftc.mutation.Int32(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -695,7 +707,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldInt32,
 		})
-		ft.Int32 = value
+		_node.Int32 = value
 	}
 	if value, ok := ftc.mutation.Int64(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -703,7 +715,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldInt64,
 		})
-		ft.Int64 = value
+		_node.Int64 = value
 	}
 	if value, ok := ftc.mutation.OptionalInt(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -711,7 +723,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalInt,
 		})
-		ft.OptionalInt = value
+		_node.OptionalInt = value
 	}
 	if value, ok := ftc.mutation.OptionalInt8(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -719,7 +731,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalInt8,
 		})
-		ft.OptionalInt8 = value
+		_node.OptionalInt8 = value
 	}
 	if value, ok := ftc.mutation.OptionalInt16(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -727,7 +739,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalInt16,
 		})
-		ft.OptionalInt16 = value
+		_node.OptionalInt16 = value
 	}
 	if value, ok := ftc.mutation.OptionalInt32(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -735,7 +747,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalInt32,
 		})
-		ft.OptionalInt32 = value
+		_node.OptionalInt32 = value
 	}
 	if value, ok := ftc.mutation.OptionalInt64(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -743,7 +755,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalInt64,
 		})
-		ft.OptionalInt64 = value
+		_node.OptionalInt64 = value
 	}
 	if value, ok := ftc.mutation.NillableInt(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -751,7 +763,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNillableInt,
 		})
-		ft.NillableInt = &value
+		_node.NillableInt = &value
 	}
 	if value, ok := ftc.mutation.NillableInt8(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -759,7 +771,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNillableInt8,
 		})
-		ft.NillableInt8 = &value
+		_node.NillableInt8 = &value
 	}
 	if value, ok := ftc.mutation.NillableInt16(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -767,7 +779,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNillableInt16,
 		})
-		ft.NillableInt16 = &value
+		_node.NillableInt16 = &value
 	}
 	if value, ok := ftc.mutation.NillableInt32(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -775,7 +787,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNillableInt32,
 		})
-		ft.NillableInt32 = &value
+		_node.NillableInt32 = &value
 	}
 	if value, ok := ftc.mutation.NillableInt64(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -783,7 +795,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNillableInt64,
 		})
-		ft.NillableInt64 = &value
+		_node.NillableInt64 = &value
 	}
 	if value, ok := ftc.mutation.ValidateOptionalInt32(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -791,7 +803,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldValidateOptionalInt32,
 		})
-		ft.ValidateOptionalInt32 = value
+		_node.ValidateOptionalInt32 = value
 	}
 	if value, ok := ftc.mutation.OptionalUint(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -799,7 +811,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalUint,
 		})
-		ft.OptionalUint = value
+		_node.OptionalUint = value
 	}
 	if value, ok := ftc.mutation.OptionalUint8(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -807,7 +819,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalUint8,
 		})
-		ft.OptionalUint8 = value
+		_node.OptionalUint8 = value
 	}
 	if value, ok := ftc.mutation.OptionalUint16(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -815,7 +827,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalUint16,
 		})
-		ft.OptionalUint16 = value
+		_node.OptionalUint16 = value
 	}
 	if value, ok := ftc.mutation.OptionalUint32(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -823,7 +835,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalUint32,
 		})
-		ft.OptionalUint32 = value
+		_node.OptionalUint32 = value
 	}
 	if value, ok := ftc.mutation.OptionalUint64(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -831,7 +843,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalUint64,
 		})
-		ft.OptionalUint64 = value
+		_node.OptionalUint64 = value
 	}
 	if value, ok := ftc.mutation.State(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -839,7 +851,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldState,
 		})
-		ft.State = value
+		_node.State = value
 	}
 	if value, ok := ftc.mutation.OptionalFloat(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -847,7 +859,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalFloat,
 		})
-		ft.OptionalFloat = value
+		_node.OptionalFloat = value
 	}
 	if value, ok := ftc.mutation.OptionalFloat32(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -855,7 +867,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldOptionalFloat32,
 		})
-		ft.OptionalFloat32 = value
+		_node.OptionalFloat32 = value
 	}
 	if value, ok := ftc.mutation.Datetime(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -863,7 +875,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldDatetime,
 		})
-		ft.Datetime = value
+		_node.Datetime = value
 	}
 	if value, ok := ftc.mutation.Decimal(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -871,7 +883,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldDecimal,
 		})
-		ft.Decimal = value
+		_node.Decimal = value
 	}
 	if value, ok := ftc.mutation.Dir(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -879,7 +891,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldDir,
 		})
-		ft.Dir = value
+		_node.Dir = value
 	}
 	if value, ok := ftc.mutation.Ndir(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -887,7 +899,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNdir,
 		})
-		ft.Ndir = &value
+		_node.Ndir = &value
 	}
 	if value, ok := ftc.mutation.Str(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -895,7 +907,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldStr,
 		})
-		ft.Str = value
+		_node.Str = value
 	}
 	if value, ok := ftc.mutation.NullStr(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -903,7 +915,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNullStr,
 		})
-		ft.NullStr = &value
+		_node.NullStr = &value
 	}
 	if value, ok := ftc.mutation.Link(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -911,7 +923,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldLink,
 		})
-		ft.Link = value
+		_node.Link = value
 	}
 	if value, ok := ftc.mutation.NullLink(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -919,7 +931,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNullLink,
 		})
-		ft.NullLink = &value
+		_node.NullLink = &value
 	}
 	if value, ok := ftc.mutation.Active(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -927,7 +939,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldActive,
 		})
-		ft.Active = value
+		_node.Active = value
 	}
 	if value, ok := ftc.mutation.NullActive(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -935,7 +947,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNullActive,
 		})
-		ft.NullActive = &value
+		_node.NullActive = &value
 	}
 	if value, ok := ftc.mutation.Deleted(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -943,7 +955,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldDeleted,
 		})
-		ft.Deleted = value
+		_node.Deleted = value
 	}
 	if value, ok := ftc.mutation.DeletedAt(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -951,7 +963,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldDeletedAt,
 		})
-		ft.DeletedAt = value
+		_node.DeletedAt = value
 	}
 	if value, ok := ftc.mutation.IP(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -959,7 +971,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldIP,
 		})
-		ft.IP = value
+		_node.IP = value
 	}
 	if value, ok := ftc.mutation.NullInt64(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -967,7 +979,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNullInt64,
 		})
-		ft.NullInt64 = value
+		_node.NullInt64 = value
 	}
 	if value, ok := ftc.mutation.SchemaInt(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -975,7 +987,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldSchemaInt,
 		})
-		ft.SchemaInt = value
+		_node.SchemaInt = value
 	}
 	if value, ok := ftc.mutation.SchemaInt8(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -983,7 +995,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldSchemaInt8,
 		})
-		ft.SchemaInt8 = value
+		_node.SchemaInt8 = value
 	}
 	if value, ok := ftc.mutation.SchemaInt64(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -991,7 +1003,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldSchemaInt64,
 		})
-		ft.SchemaInt64 = value
+		_node.SchemaInt64 = value
 	}
 	if value, ok := ftc.mutation.SchemaFloat(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -999,7 +1011,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldSchemaFloat,
 		})
-		ft.SchemaFloat = value
+		_node.SchemaFloat = value
 	}
 	if value, ok := ftc.mutation.SchemaFloat32(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -1007,7 +1019,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldSchemaFloat32,
 		})
-		ft.SchemaFloat32 = value
+		_node.SchemaFloat32 = value
 	}
 	if value, ok := ftc.mutation.NullFloat(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -1015,7 +1027,7 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldNullFloat,
 		})
-		ft.NullFloat = value
+		_node.NullFloat = value
 	}
 	if value, ok := ftc.mutation.Role(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -1023,9 +1035,9 @@ func (ftc *FieldTypeCreate) createSpec() (*FieldType, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: fieldtype.FieldRole,
 		})
-		ft.Role = value
+		_node.Role = value
 	}
-	return ft, _spec
+	return _node, _spec
 }
 
 // FieldTypeCreateBulk is the builder for creating a bulk of FieldType entities.
@@ -1042,13 +1054,14 @@ func (ftcb *FieldTypeCreateBulk) Save(ctx context.Context) ([]*FieldType, error)
 	for i := range ftcb.builders {
 		func(i int, root context.Context) {
 			builder := ftcb.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*FieldTypeMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

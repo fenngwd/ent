@@ -52,20 +52,23 @@ func (cc *CityCreate) Mutation() *CityMutation {
 
 // Save creates the City in the database.
 func (cc *CityCreate) Save(ctx context.Context) (*City, error) {
-	if err := cc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *City
 	)
 	if len(cc.hooks) == 0 {
+		if err = cc.check(); err != nil {
+			return nil, err
+		}
 		node, err = cc.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*CityMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = cc.check(); err != nil {
+				return nil, err
 			}
 			cc.mutation = mutation
 			node, err = cc.sqlSave(ctx)
@@ -91,7 +94,8 @@ func (cc *CityCreate) SaveX(ctx context.Context) *City {
 	return v
 }
 
-func (cc *CityCreate) preSave() error {
+// check runs all checks and user-defined validators on the builder.
+func (cc *CityCreate) check() error {
 	if _, ok := cc.mutation.Name(); !ok {
 		return &ValidationError{Name: "name", err: errors.New("ent: missing required field \"name\"")}
 	}
@@ -99,7 +103,7 @@ func (cc *CityCreate) preSave() error {
 }
 
 func (cc *CityCreate) sqlSave(ctx context.Context) (*City, error) {
-	c, _spec := cc.createSpec()
+	_node, _spec := cc.createSpec()
 	if err := sqlgraph.CreateNode(ctx, cc.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -107,13 +111,13 @@ func (cc *CityCreate) sqlSave(ctx context.Context) (*City, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	c.ID = int(id)
-	return c, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (cc *CityCreate) createSpec() (*City, *sqlgraph.CreateSpec) {
 	var (
-		c     = &City{config: cc.config}
+		_node = &City{config: cc.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: city.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -128,7 +132,7 @@ func (cc *CityCreate) createSpec() (*City, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: city.FieldName,
 		})
-		c.Name = value
+		_node.Name = value
 	}
 	if nodes := cc.mutation.StreetsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -149,7 +153,7 @@ func (cc *CityCreate) createSpec() (*City, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	return c, _spec
+	return _node, _spec
 }
 
 // CityCreateBulk is the builder for creating a bulk of City entities.
@@ -167,12 +171,12 @@ func (ccb *CityCreateBulk) Save(ctx context.Context) ([]*City, error) {
 		func(i int, root context.Context) {
 			builder := ccb.builders[i]
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*CityMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

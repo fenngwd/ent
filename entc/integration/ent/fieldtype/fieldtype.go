@@ -167,6 +167,21 @@ var ForeignKeys = []string{
 	"file_field",
 }
 
+// ValidColumn reports if the column name is valid (part of the table columns).
+func ValidColumn(column string) bool {
+	for i := range Columns {
+		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
+			return true
+		}
+	}
+	return false
+}
+
 var (
 	// ValidateOptionalInt32Validator is a validator for the "validate_optional_int32" field. It is called by the builders before save.
 	ValidateOptionalInt32Validator func(int32) error
@@ -181,8 +196,8 @@ type State string
 
 // State values.
 const (
-	StateOff State = "off"
 	StateOn  State = "on"
+	StateOff State = "off"
 )
 
 func (s State) String() string {
@@ -192,7 +207,7 @@ func (s State) String() string {
 // StateValidator is a validator for the "state" field enum values. It is called by the builders before save.
 func StateValidator(s State) error {
 	switch s {
-	case StateOff, StateOn:
+	case StateOn, StateOff:
 		return nil
 	default:
 		return fmt.Errorf("fieldtype: invalid enum value for state field: %q", s)
@@ -204,7 +219,7 @@ const DefaultRole role.Role = "READ"
 // RoleValidator is a validator for the "role" field enum values. It is called by the builders before save.
 func RoleValidator(r role.Role) error {
 	switch r {
-	case "ADMIN", "OWNER", "READ", "USER", "WRITE":
+	case "ADMIN", "OWNER", "USER", "READ", "WRITE":
 		return nil
 	default:
 		return fmt.Errorf("fieldtype: invalid enum value for role field: %q", r)

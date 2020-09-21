@@ -41,6 +41,7 @@ type CardMutation struct {
 	number        *string
 	name          *string
 	created_at    *time.Time
+	in_hook       *string
 	clearedFields map[string]struct{}
 	owner         *int
 	clearedowner  bool
@@ -251,6 +252,43 @@ func (m *CardMutation) ResetCreatedAt() {
 	m.created_at = nil
 }
 
+// SetInHook sets the in_hook field.
+func (m *CardMutation) SetInHook(s string) {
+	m.in_hook = &s
+}
+
+// InHook returns the in_hook value in the mutation.
+func (m *CardMutation) InHook() (r string, exists bool) {
+	v := m.in_hook
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldInHook returns the old in_hook value of the Card.
+// If the Card object wasn't provided to the builder, the object is fetched
+// from the database.
+// An error is returned if the mutation operation is not UpdateOne, or database query fails.
+func (m *CardMutation) OldInHook(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, fmt.Errorf("OldInHook is allowed only on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, fmt.Errorf("OldInHook requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldInHook: %w", err)
+	}
+	return oldValue.InHook, nil
+}
+
+// ResetInHook reset all changes of the "in_hook" field.
+func (m *CardMutation) ResetInHook() {
+	m.in_hook = nil
+}
+
 // SetOwnerID sets the owner edge to User by id.
 func (m *CardMutation) SetOwnerID(id int) {
 	m.owner = &id
@@ -304,7 +342,7 @@ func (m *CardMutation) Type() string {
 // this mutation. Note that, in order to get all numeric
 // fields that were in/decremented, call AddedFields().
 func (m *CardMutation) Fields() []string {
-	fields := make([]string, 0, 3)
+	fields := make([]string, 0, 4)
 	if m.number != nil {
 		fields = append(fields, card.FieldNumber)
 	}
@@ -313,6 +351,9 @@ func (m *CardMutation) Fields() []string {
 	}
 	if m.created_at != nil {
 		fields = append(fields, card.FieldCreatedAt)
+	}
+	if m.in_hook != nil {
+		fields = append(fields, card.FieldInHook)
 	}
 	return fields
 }
@@ -328,6 +369,8 @@ func (m *CardMutation) Field(name string) (ent.Value, bool) {
 		return m.Name()
 	case card.FieldCreatedAt:
 		return m.CreatedAt()
+	case card.FieldInHook:
+		return m.InHook()
 	}
 	return nil, false
 }
@@ -343,6 +386,8 @@ func (m *CardMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldName(ctx)
 	case card.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
+	case card.FieldInHook:
+		return m.OldInHook(ctx)
 	}
 	return nil, fmt.Errorf("unknown Card field %s", name)
 }
@@ -372,6 +417,13 @@ func (m *CardMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetCreatedAt(v)
+		return nil
+	case card.FieldInHook:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetInHook(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Card field %s", name)
@@ -440,6 +492,9 @@ func (m *CardMutation) ResetField(name string) error {
 		return nil
 	case card.FieldCreatedAt:
 		m.ResetCreatedAt()
+		return nil
+	case card.FieldInHook:
+		m.ResetInHook()
 		return nil
 	}
 	return fmt.Errorf("unknown Card field %s", name)
@@ -540,8 +595,10 @@ type UserMutation struct {
 	clearedFields      map[string]struct{}
 	cards              map[int]struct{}
 	removedcards       map[int]struct{}
+	clearedcards       bool
 	friends            map[int]struct{}
 	removedfriends     map[int]struct{}
+	clearedfriends     bool
 	best_friend        *int
 	clearedbest_friend bool
 	done               bool
@@ -802,6 +859,16 @@ func (m *UserMutation) AddCardIDs(ids ...int) {
 	}
 }
 
+// ClearCards clears the cards edge to Card.
+func (m *UserMutation) ClearCards() {
+	m.clearedcards = true
+}
+
+// CardsCleared returns if the edge cards was cleared.
+func (m *UserMutation) CardsCleared() bool {
+	return m.clearedcards
+}
+
 // RemoveCardIDs removes the cards edge to Card by ids.
 func (m *UserMutation) RemoveCardIDs(ids ...int) {
 	if m.removedcards == nil {
@@ -831,6 +898,7 @@ func (m *UserMutation) CardsIDs() (ids []int) {
 // ResetCards reset all changes of the "cards" edge.
 func (m *UserMutation) ResetCards() {
 	m.cards = nil
+	m.clearedcards = false
 	m.removedcards = nil
 }
 
@@ -842,6 +910,16 @@ func (m *UserMutation) AddFriendIDs(ids ...int) {
 	for i := range ids {
 		m.friends[ids[i]] = struct{}{}
 	}
+}
+
+// ClearFriends clears the friends edge to User.
+func (m *UserMutation) ClearFriends() {
+	m.clearedfriends = true
+}
+
+// FriendsCleared returns if the edge friends was cleared.
+func (m *UserMutation) FriendsCleared() bool {
+	return m.clearedfriends
 }
 
 // RemoveFriendIDs removes the friends edge to User by ids.
@@ -873,6 +951,7 @@ func (m *UserMutation) FriendsIDs() (ids []int) {
 // ResetFriends reset all changes of the "friends" edge.
 func (m *UserMutation) ResetFriends() {
 	m.friends = nil
+	m.clearedfriends = false
 	m.removedfriends = nil
 }
 
@@ -1174,6 +1253,12 @@ func (m *UserMutation) RemovedIDs(name string) []ent.Value {
 // mutation.
 func (m *UserMutation) ClearedEdges() []string {
 	edges := make([]string, 0, 3)
+	if m.clearedcards {
+		edges = append(edges, user.EdgeCards)
+	}
+	if m.clearedfriends {
+		edges = append(edges, user.EdgeFriends)
+	}
 	if m.clearedbest_friend {
 		edges = append(edges, user.EdgeBestFriend)
 	}
@@ -1184,6 +1269,10 @@ func (m *UserMutation) ClearedEdges() []string {
 // cleared in this mutation.
 func (m *UserMutation) EdgeCleared(name string) bool {
 	switch name {
+	case user.EdgeCards:
+		return m.clearedcards
+	case user.EdgeFriends:
+		return m.clearedfriends
 	case user.EdgeBestFriend:
 		return m.clearedbest_friend
 	}

@@ -170,6 +170,12 @@ func (gu *GroupUpdate) Mutation() *GroupMutation {
 	return gu.mutation
 }
 
+// ClearFiles clears all "files" edges to type File.
+func (gu *GroupUpdate) ClearFiles() *GroupUpdate {
+	gu.mutation.ClearFiles()
+	return gu
+}
+
 // RemoveFileIDs removes the files edge to File by ids.
 func (gu *GroupUpdate) RemoveFileIDs(ids ...string) *GroupUpdate {
 	gu.mutation.RemoveFileIDs(ids...)
@@ -183,6 +189,12 @@ func (gu *GroupUpdate) RemoveFiles(f ...*File) *GroupUpdate {
 		ids[i] = f[i].ID
 	}
 	return gu.RemoveFileIDs(ids...)
+}
+
+// ClearBlocked clears all "blocked" edges to type User.
+func (gu *GroupUpdate) ClearBlocked() *GroupUpdate {
+	gu.mutation.ClearBlocked()
+	return gu
 }
 
 // RemoveBlockedIDs removes the blocked edge to User by ids.
@@ -200,6 +212,12 @@ func (gu *GroupUpdate) RemoveBlocked(u ...*User) *GroupUpdate {
 	return gu.RemoveBlockedIDs(ids...)
 }
 
+// ClearUsers clears all "users" edges to type User.
+func (gu *GroupUpdate) ClearUsers() *GroupUpdate {
+	gu.mutation.ClearUsers()
+	return gu
+}
+
 // RemoveUserIDs removes the users edge to User by ids.
 func (gu *GroupUpdate) RemoveUserIDs(ids ...string) *GroupUpdate {
 	gu.mutation.RemoveUserIDs(ids...)
@@ -215,7 +233,7 @@ func (gu *GroupUpdate) RemoveUsers(u ...*User) *GroupUpdate {
 	return gu.RemoveUserIDs(ids...)
 }
 
-// ClearInfo clears the info edge to GroupInfo.
+// ClearInfo clears the "info" edge to type GroupInfo.
 func (gu *GroupUpdate) ClearInfo() *GroupUpdate {
 	gu.mutation.ClearInfo()
 	return gu
@@ -223,36 +241,23 @@ func (gu *GroupUpdate) ClearInfo() *GroupUpdate {
 
 // Save executes the query and returns the number of rows/vertices matched by this operation.
 func (gu *GroupUpdate) Save(ctx context.Context) (int, error) {
-	if v, ok := gu.mutation.GetType(); ok {
-		if err := group.TypeValidator(v); err != nil {
-			return 0, &ValidationError{Name: "type", err: fmt.Errorf("ent: validator failed for field \"type\": %w", err)}
-		}
-	}
-	if v, ok := gu.mutation.MaxUsers(); ok {
-		if err := group.MaxUsersValidator(v); err != nil {
-			return 0, &ValidationError{Name: "max_users", err: fmt.Errorf("ent: validator failed for field \"max_users\": %w", err)}
-		}
-	}
-	if v, ok := gu.mutation.Name(); ok {
-		if err := group.NameValidator(v); err != nil {
-			return 0, &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
-		}
-	}
-
-	if _, ok := gu.mutation.InfoID(); gu.mutation.InfoCleared() && !ok {
-		return 0, errors.New("ent: clearing a unique edge \"info\"")
-	}
 	var (
 		err      error
 		affected int
 	)
 	if len(gu.hooks) == 0 {
+		if err = gu.check(); err != nil {
+			return 0, err
+		}
 		affected, err = gu.gremlinSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*GroupMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = gu.check(); err != nil {
+				return 0, err
 			}
 			gu.mutation = mutation
 			affected, err = gu.gremlinSave(ctx)
@@ -289,6 +294,29 @@ func (gu *GroupUpdate) ExecX(ctx context.Context) {
 	if err := gu.Exec(ctx); err != nil {
 		panic(err)
 	}
+}
+
+// check runs all checks and user-defined validators on the builder.
+func (gu *GroupUpdate) check() error {
+	if v, ok := gu.mutation.GetType(); ok {
+		if err := group.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf("ent: validator failed for field \"type\": %w", err)}
+		}
+	}
+	if v, ok := gu.mutation.MaxUsers(); ok {
+		if err := group.MaxUsersValidator(v); err != nil {
+			return &ValidationError{Name: "max_users", err: fmt.Errorf("ent: validator failed for field \"max_users\": %w", err)}
+		}
+	}
+	if v, ok := gu.mutation.Name(); ok {
+		if err := group.NameValidator(v); err != nil {
+			return &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
+		}
+	}
+	if _, ok := gu.mutation.InfoID(); gu.mutation.InfoCleared() && !ok {
+		return errors.New("ent: clearing a required unique edge \"info\"")
+	}
+	return nil
 }
 
 func (gu *GroupUpdate) gremlinSave(ctx context.Context) (int, error) {
@@ -539,6 +567,12 @@ func (guo *GroupUpdateOne) Mutation() *GroupMutation {
 	return guo.mutation
 }
 
+// ClearFiles clears all "files" edges to type File.
+func (guo *GroupUpdateOne) ClearFiles() *GroupUpdateOne {
+	guo.mutation.ClearFiles()
+	return guo
+}
+
 // RemoveFileIDs removes the files edge to File by ids.
 func (guo *GroupUpdateOne) RemoveFileIDs(ids ...string) *GroupUpdateOne {
 	guo.mutation.RemoveFileIDs(ids...)
@@ -552,6 +586,12 @@ func (guo *GroupUpdateOne) RemoveFiles(f ...*File) *GroupUpdateOne {
 		ids[i] = f[i].ID
 	}
 	return guo.RemoveFileIDs(ids...)
+}
+
+// ClearBlocked clears all "blocked" edges to type User.
+func (guo *GroupUpdateOne) ClearBlocked() *GroupUpdateOne {
+	guo.mutation.ClearBlocked()
+	return guo
 }
 
 // RemoveBlockedIDs removes the blocked edge to User by ids.
@@ -569,6 +609,12 @@ func (guo *GroupUpdateOne) RemoveBlocked(u ...*User) *GroupUpdateOne {
 	return guo.RemoveBlockedIDs(ids...)
 }
 
+// ClearUsers clears all "users" edges to type User.
+func (guo *GroupUpdateOne) ClearUsers() *GroupUpdateOne {
+	guo.mutation.ClearUsers()
+	return guo
+}
+
 // RemoveUserIDs removes the users edge to User by ids.
 func (guo *GroupUpdateOne) RemoveUserIDs(ids ...string) *GroupUpdateOne {
 	guo.mutation.RemoveUserIDs(ids...)
@@ -584,7 +630,7 @@ func (guo *GroupUpdateOne) RemoveUsers(u ...*User) *GroupUpdateOne {
 	return guo.RemoveUserIDs(ids...)
 }
 
-// ClearInfo clears the info edge to GroupInfo.
+// ClearInfo clears the "info" edge to type GroupInfo.
 func (guo *GroupUpdateOne) ClearInfo() *GroupUpdateOne {
 	guo.mutation.ClearInfo()
 	return guo
@@ -592,36 +638,23 @@ func (guo *GroupUpdateOne) ClearInfo() *GroupUpdateOne {
 
 // Save executes the query and returns the updated entity.
 func (guo *GroupUpdateOne) Save(ctx context.Context) (*Group, error) {
-	if v, ok := guo.mutation.GetType(); ok {
-		if err := group.TypeValidator(v); err != nil {
-			return nil, &ValidationError{Name: "type", err: fmt.Errorf("ent: validator failed for field \"type\": %w", err)}
-		}
-	}
-	if v, ok := guo.mutation.MaxUsers(); ok {
-		if err := group.MaxUsersValidator(v); err != nil {
-			return nil, &ValidationError{Name: "max_users", err: fmt.Errorf("ent: validator failed for field \"max_users\": %w", err)}
-		}
-	}
-	if v, ok := guo.mutation.Name(); ok {
-		if err := group.NameValidator(v); err != nil {
-			return nil, &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
-		}
-	}
-
-	if _, ok := guo.mutation.InfoID(); guo.mutation.InfoCleared() && !ok {
-		return nil, errors.New("ent: clearing a unique edge \"info\"")
-	}
 	var (
 		err  error
 		node *Group
 	)
 	if len(guo.hooks) == 0 {
+		if err = guo.check(); err != nil {
+			return nil, err
+		}
 		node, err = guo.gremlinSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*GroupMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = guo.check(); err != nil {
+				return nil, err
 			}
 			guo.mutation = mutation
 			node, err = guo.gremlinSave(ctx)
@@ -640,11 +673,11 @@ func (guo *GroupUpdateOne) Save(ctx context.Context) (*Group, error) {
 
 // SaveX is like Save, but panics if an error occurs.
 func (guo *GroupUpdateOne) SaveX(ctx context.Context) *Group {
-	gr, err := guo.Save(ctx)
+	node, err := guo.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return gr
+	return node
 }
 
 // Exec executes the query on the entity.
@@ -658,6 +691,29 @@ func (guo *GroupUpdateOne) ExecX(ctx context.Context) {
 	if err := guo.Exec(ctx); err != nil {
 		panic(err)
 	}
+}
+
+// check runs all checks and user-defined validators on the builder.
+func (guo *GroupUpdateOne) check() error {
+	if v, ok := guo.mutation.GetType(); ok {
+		if err := group.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf("ent: validator failed for field \"type\": %w", err)}
+		}
+	}
+	if v, ok := guo.mutation.MaxUsers(); ok {
+		if err := group.MaxUsersValidator(v); err != nil {
+			return &ValidationError{Name: "max_users", err: fmt.Errorf("ent: validator failed for field \"max_users\": %w", err)}
+		}
+	}
+	if v, ok := guo.mutation.Name(); ok {
+		if err := group.NameValidator(v); err != nil {
+			return &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
+		}
+	}
+	if _, ok := guo.mutation.InfoID(); guo.mutation.InfoCleared() && !ok {
+		return errors.New("ent: clearing a required unique edge \"info\"")
+	}
+	return nil
 }
 
 func (guo *GroupUpdateOne) gremlinSave(ctx context.Context) (*Group, error) {

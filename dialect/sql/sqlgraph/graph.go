@@ -547,7 +547,11 @@ type query struct {
 
 func (q *query) nodes(ctx context.Context, drv dialect.Driver) error {
 	rows := &sql.Rows{}
-	query, args := q.selector().Query()
+	selector, err := q.selector()
+	if err != nil {
+		return err
+	}
+	query, args := selector.Query()
 	if err := drv.Query(ctx, query, args, rows); err != nil {
 		return err
 	}
@@ -566,7 +570,10 @@ func (q *query) nodes(ctx context.Context, drv dialect.Driver) error {
 
 func (q *query) count(ctx context.Context, drv dialect.Driver) (int, error) {
 	rows := &sql.Rows{}
-	selector := q.selector()
+	selector, err := q.selector()
+	if err != nil {
+		return 0, err
+	}
 	selector.Count(selector.C(q.Node.ID.Column))
 	if q.Unique {
 		selector.SetDistinct(false)
@@ -580,7 +587,7 @@ func (q *query) count(ctx context.Context, drv dialect.Driver) (int, error) {
 	return sql.ScanInt(rows)
 }
 
-func (q *query) selector() *sql.Selector {
+func (q *query) selector() (*sql.Selector, error) {
 	selector := q.builder.Select().From(q.builder.Table(q.Node.Table))
 	if q.From != nil {
 		selector = q.From
@@ -603,7 +610,10 @@ func (q *query) selector() *sql.Selector {
 	if q.Unique {
 		selector.Distinct()
 	}
-	return selector
+	if err := selector.Err(); err != nil {
+		return nil, err
+	}
+	return selector, nil
 }
 
 type updater struct {
@@ -938,7 +948,7 @@ type graph struct {
 func (g *graph) clearM2MEdges(ctx context.Context, ids []driver.Value, edges EdgeSpecs) error {
 	var (
 		res sql.Result
-		// Delete all M2M edges from the same type at once.
+		// Remove all M2M edges from the same type at once.
 		// The EdgeSpec is the same for all members in a group.
 		tables = edges.GroupTable()
 	)
@@ -946,13 +956,23 @@ func (g *graph) clearM2MEdges(ctx context.Context, ids []driver.Value, edges Edg
 		edges := tables[table]
 		preds := make([]*sql.Predicate, 0, len(edges))
 		for _, edge := range edges {
-			pk1, pk2 := ids, edge.Target.Nodes
+			fromC, toC := edge.Columns[0], edge.Columns[1]
 			if edge.Inverse {
-				pk1, pk2 = pk2, pk1
+				fromC, toC = toC, fromC
 			}
-			preds = append(preds, matchIDs(edge.Columns[0], pk1, edge.Columns[1], pk2))
-			if edge.Bidi {
-				preds = append(preds, matchIDs(edge.Columns[0], pk2, edge.Columns[1], pk1))
+			// If there are no specific edges (to target-nodes) to remove,
+			// clear all edges that go out (or come in) from the nodes.
+			if len(edge.Target.Nodes) == 0 {
+				preds = append(preds, matchID(fromC, ids))
+				if edge.Bidi {
+					preds = append(preds, matchID(toC, ids))
+				}
+			} else {
+				pk1, pk2 := ids, edge.Target.Nodes
+				preds = append(preds, matchIDs(fromC, pk1, toC, pk2))
+				if edge.Bidi {
+					preds = append(preds, matchIDs(toC, pk1, fromC, pk2))
+				}
 			}
 		}
 		query, args := g.builder.Delete(table).Where(sql.Or(preds...)).Query()

@@ -19,6 +19,8 @@ const (
 	FieldUser = "user"
 	// FieldGroup holds the string denoting the group field in the database.
 	FieldGroup = "group"
+	// FieldOp holds the string denoting the op field in the database.
+	FieldOp = "op"
 
 	// EdgeOwner holds the string denoting the owner edge name in mutations.
 	EdgeOwner = "owner"
@@ -59,6 +61,7 @@ var Columns = []string{
 	FieldName,
 	FieldUser,
 	FieldGroup,
+	FieldOp,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the File type.
@@ -66,6 +69,21 @@ var ForeignKeys = []string{
 	"file_type_files",
 	"group_files",
 	"user_files",
+}
+
+// ValidColumn reports if the column name is valid (part of the table columns).
+func ValidColumn(column string) bool {
+	for i := range Columns {
+		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
+			return true
+		}
+	}
+	return false
 }
 
 var (

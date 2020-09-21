@@ -300,6 +300,21 @@ func (t Type) HasNumeric() bool {
 	return false
 }
 
+// HasUpdateCheckers reports if this type has any checkers to run on update(one).
+func (t Type) HasUpdateCheckers() bool {
+	for _, f := range t.Fields {
+		if (f.Validators > 0 || f.IsEnum()) && !f.Immutable {
+			return true
+		}
+	}
+	for _, e := range t.Edges {
+		if e.Unique && !e.Optional {
+			return true
+		}
+	}
+	return false
+}
+
 // FKEdges returns all edges that reside on the type table as foreign-keys.
 func (t Type) FKEdges() (edges []*Edge) {
 	for _, e := range t.Edges {
@@ -898,9 +913,9 @@ var (
 // BasicType returns a Go expression for the given identifier
 // to convert it to a basic type. For example:
 //
-//	v (http.Dir)			=> string(v)
-//	v (fmt.Stringer)		=> v.String()
-//	v (database/sql.NullString)	=> v.String
+//	v (http.Dir)		=> string(v)
+//	v (fmt.Stringer)	=> v.String()
+//	v (sql.NullString)	=> v.String
 //
 func (f Field) BasicType(ident string) (expr string) {
 	if !f.HasGoType() {
@@ -960,17 +975,17 @@ func (f Field) enums(lf *load.Field) ([]Enum, error) {
 	}
 	enums := make([]Enum, 0, len(lf.Enums))
 	values := make(map[string]bool, len(lf.Enums))
-	for name, e := range lf.Enums {
-		switch {
-		case e == "":
+	for i := range lf.Enums {
+		switch name, value := lf.Enums[i].N, lf.Enums[i].V; {
+		case value == "":
 			return nil, fmt.Errorf("%q field value cannot be empty", f.Name)
-		case values[e]:
-			return nil, fmt.Errorf("duplicate values %q for enum field %q", e, f.Name)
-		case strings.IndexFunc(e, unicode.IsSpace) != -1:
-			return nil, fmt.Errorf("enum value %q cannot contain spaces", e)
+		case values[value]:
+			return nil, fmt.Errorf("duplicate values %q for enum field %q", value, f.Name)
+		case strings.IndexFunc(value, unicode.IsSpace) != -1:
+			return nil, fmt.Errorf("enum value %q cannot contain spaces", value)
 		default:
-			values[e] = true
-			enums = append(enums, Enum{Name: f.EnumName(name), Value: e})
+			values[value] = true
+			enums = append(enums, Enum{Name: f.EnumName(name), Value: value})
 		}
 	}
 	if value := lf.DefaultValue; value != nil {
@@ -978,9 +993,6 @@ func (f Field) enums(lf *load.Field) ([]Enum, error) {
 			return nil, fmt.Errorf("invalid default value for enum field %q", f.Name)
 		}
 	}
-	sort.Slice(enums, func(i, j int) bool {
-		return enums[i].Value < enums[j].Value
-	})
 	return enums, nil
 }
 
@@ -1084,6 +1096,29 @@ func (e Edge) MutationReset() string {
 	return name
 }
 
+// MutationClear returns the method name for clearing the edge value.
+// The default name is "Clear<EdgeName>". If the the method conflicts
+// with the mutation methods, suffix the method with "Edge".
+func (e Edge) MutationClear() string {
+	name := "Clear" + pascal(e.Name)
+	if _, ok := mutMethods[name]; ok {
+		name += "Edge"
+	}
+	return name
+}
+
+// MutationCleared returns the method name for indicating if the edge
+// was cleared in the mutation. The default name is "<EdgeName>Cleared".
+// If the the method conflicts with the mutation methods, add "Edge" the
+// after the edge name.
+func (e Edge) MutationCleared() string {
+	name := pascal(e.Name) + "Cleared"
+	if _, ok := mutMethods[name]; ok {
+		return pascal(e.Name) + "EdgeCleared"
+	}
+	return name
+}
+
 // setStorageKey sets the storage-key option in the schema or fail.
 func (e *Edge) setStorageKey() error {
 	rel := e.Rel
@@ -1168,36 +1203,55 @@ func structTag(name, tag string) string {
 // and ensures it doesn't conflict with Go keywords and other
 // builder fields and it's not exported.
 func builderField(name string) string {
-	if token.Lookup(name).IsKeyword() || name == "config" || strings.ToUpper(name[:1]) == name[:1] {
+	_, ok := privateField[name]
+	if ok || token.Lookup(name).IsKeyword() || strings.ToUpper(name[:1]) == name[:1] {
 		return "_" + name
 	}
 	return name
 }
 
-// global identifiers used by the generated package.
-var globalIdent = names(
-	"AggregateFunc",
-	"As",
-	"Asc",
-	"Count",
-	"Debug",
-	"Desc",
-	"Driver",
-	"Hook",
-	"Log",
-	"MutateFunc",
-	"Mutation",
-	"Mutator",
-	"Op",
-	"Option",
-	"OrderFunc",
-	"Max",
-	"Mean",
-	"Min",
-	"Sum",
-	"Policy",
-	"Query",
-	"Value",
+var (
+	// global identifiers used by the generated package.
+	globalIdent = names(
+		"AggregateFunc",
+		"As",
+		"Asc",
+		"Count",
+		"Debug",
+		"Desc",
+		"Driver",
+		"Hook",
+		"Log",
+		"MutateFunc",
+		"Mutation",
+		"Mutator",
+		"Op",
+		"Option",
+		"OrderFunc",
+		"Max",
+		"Mean",
+		"Min",
+		"Sum",
+		"Policy",
+		"Query",
+		"Value",
+	)
+	// private fields used by the different builders.
+	privateField = names(
+		"config",
+		"done",
+		"hooks",
+		"limit",
+		"mutation",
+		"offset",
+		"oldValue",
+		"order",
+		"op",
+		"path",
+		"predicates",
+		"typ",
+		"unique",
+	)
 )
 
 func names(ids ...string) map[string]struct{} {

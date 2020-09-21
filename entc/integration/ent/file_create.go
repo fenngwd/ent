@@ -74,6 +74,20 @@ func (fc *FileCreate) SetNillableGroup(s *string) *FileCreate {
 	return fc
 }
 
+// SetOp sets the op field.
+func (fc *FileCreate) SetOp(b bool) *FileCreate {
+	fc.mutation.SetOp(b)
+	return fc
+}
+
+// SetNillableOp sets the op field if the given value is not nil.
+func (fc *FileCreate) SetNillableOp(b *bool) *FileCreate {
+	if b != nil {
+		fc.SetOp(*b)
+	}
+	return fc
+}
+
 // SetOwnerID sets the owner edge to User by id.
 func (fc *FileCreate) SetOwnerID(id int) *FileCreate {
 	fc.mutation.SetOwnerID(id)
@@ -134,20 +148,24 @@ func (fc *FileCreate) Mutation() *FileMutation {
 
 // Save creates the File in the database.
 func (fc *FileCreate) Save(ctx context.Context) (*File, error) {
-	if err := fc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *File
 	)
+	fc.defaults()
 	if len(fc.hooks) == 0 {
+		if err = fc.check(); err != nil {
+			return nil, err
+		}
 		node, err = fc.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*FileMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = fc.check(); err != nil {
+				return nil, err
 			}
 			fc.mutation = mutation
 			node, err = fc.sqlSave(ctx)
@@ -173,10 +191,18 @@ func (fc *FileCreate) SaveX(ctx context.Context) *File {
 	return v
 }
 
-func (fc *FileCreate) preSave() error {
+// defaults sets the default values of the builder before save.
+func (fc *FileCreate) defaults() {
 	if _, ok := fc.mutation.Size(); !ok {
 		v := file.DefaultSize
 		fc.mutation.SetSize(v)
+	}
+}
+
+// check runs all checks and user-defined validators on the builder.
+func (fc *FileCreate) check() error {
+	if _, ok := fc.mutation.Size(); !ok {
+		return &ValidationError{Name: "size", err: errors.New("ent: missing required field \"size\"")}
 	}
 	if v, ok := fc.mutation.Size(); ok {
 		if err := file.SizeValidator(v); err != nil {
@@ -190,7 +216,7 @@ func (fc *FileCreate) preSave() error {
 }
 
 func (fc *FileCreate) sqlSave(ctx context.Context) (*File, error) {
-	f, _spec := fc.createSpec()
+	_node, _spec := fc.createSpec()
 	if err := sqlgraph.CreateNode(ctx, fc.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -198,13 +224,13 @@ func (fc *FileCreate) sqlSave(ctx context.Context) (*File, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	f.ID = int(id)
-	return f, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (fc *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 	var (
-		f     = &File{config: fc.config}
+		_node = &File{config: fc.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: file.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -219,7 +245,7 @@ func (fc *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: file.FieldSize,
 		})
-		f.Size = value
+		_node.Size = value
 	}
 	if value, ok := fc.mutation.Name(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -227,7 +253,7 @@ func (fc *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: file.FieldName,
 		})
-		f.Name = value
+		_node.Name = value
 	}
 	if value, ok := fc.mutation.User(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -235,7 +261,7 @@ func (fc *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: file.FieldUser,
 		})
-		f.User = &value
+		_node.User = &value
 	}
 	if value, ok := fc.mutation.Group(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -243,7 +269,15 @@ func (fc *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: file.FieldGroup,
 		})
-		f.Group = value
+		_node.Group = value
+	}
+	if value, ok := fc.mutation.GetOp(); ok {
+		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
+			Type:   field.TypeBool,
+			Value:  value,
+			Column: file.FieldOp,
+		})
+		_node.Op = value
 	}
 	if nodes := fc.mutation.OwnerIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -302,7 +336,7 @@ func (fc *FileCreate) createSpec() (*File, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	return f, _spec
+	return _node, _spec
 }
 
 // FileCreateBulk is the builder for creating a bulk of File entities.
@@ -319,13 +353,14 @@ func (fcb *FileCreateBulk) Save(ctx context.Context) ([]*File, error) {
 	for i := range fcb.builders {
 		func(i int, root context.Context) {
 			builder := fcb.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*FileMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

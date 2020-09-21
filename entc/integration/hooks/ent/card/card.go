@@ -23,6 +23,8 @@ const (
 	FieldName = "name"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
+	// FieldInHook holds the string denoting the in_hook field in the database.
+	FieldInHook = "in_hook"
 
 	// EdgeOwner holds the string denoting the owner edge name in mutations.
 	EdgeOwner = "owner"
@@ -44,11 +46,27 @@ var Columns = []string{
 	FieldNumber,
 	FieldName,
 	FieldCreatedAt,
+	FieldInHook,
 }
 
 // ForeignKeys holds the SQL foreign-keys that are owned by the Card type.
 var ForeignKeys = []string{
 	"user_cards",
+}
+
+// ValidColumn reports if the column name is valid (part of the table columns).
+func ValidColumn(column string) bool {
+	for i := range Columns {
+		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
+			return true
+		}
+	}
+	return false
 }
 
 // Note that the variables below are initialized by the runtime

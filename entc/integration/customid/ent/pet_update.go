@@ -106,9 +106,15 @@ func (pu *PetUpdate) Mutation() *PetMutation {
 	return pu.mutation
 }
 
-// ClearOwner clears the owner edge to User.
+// ClearOwner clears the "owner" edge to type User.
 func (pu *PetUpdate) ClearOwner() *PetUpdate {
 	pu.mutation.ClearOwner()
+	return pu
+}
+
+// ClearCars clears all "cars" edges to type Car.
+func (pu *PetUpdate) ClearCars() *PetUpdate {
+	pu.mutation.ClearCars()
 	return pu
 }
 
@@ -127,6 +133,12 @@ func (pu *PetUpdate) RemoveCars(c ...*Car) *PetUpdate {
 	return pu.RemoveCarIDs(ids...)
 }
 
+// ClearFriends clears all "friends" edges to type Pet.
+func (pu *PetUpdate) ClearFriends() *PetUpdate {
+	pu.mutation.ClearFriends()
+	return pu
+}
+
 // RemoveFriendIDs removes the friends edge to Pet by ids.
 func (pu *PetUpdate) RemoveFriendIDs(ids ...string) *PetUpdate {
 	pu.mutation.RemoveFriendIDs(ids...)
@@ -142,7 +154,7 @@ func (pu *PetUpdate) RemoveFriends(p ...*Pet) *PetUpdate {
 	return pu.RemoveFriendIDs(ids...)
 }
 
-// ClearBestFriend clears the best_friend edge to Pet.
+// ClearBestFriend clears the "best_friend" edge to type Pet.
 func (pu *PetUpdate) ClearBestFriend() *PetUpdate {
 	pu.mutation.ClearBestFriend()
 	return pu
@@ -150,7 +162,6 @@ func (pu *PetUpdate) ClearBestFriend() *PetUpdate {
 
 // Save executes the query and returns the number of rows/vertices matched by this operation.
 func (pu *PetUpdate) Save(ctx context.Context) (int, error) {
-
 	var (
 		err      error
 		affected int
@@ -253,7 +264,23 @@ func (pu *PetUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if nodes := pu.mutation.RemovedCarsIDs(); len(nodes) > 0 {
+	if pu.mutation.CarsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   pet.CarsTable,
+			Columns: []string{pet.CarsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: car.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := pu.mutation.RemovedCarsIDs(); len(nodes) > 0 && !pu.mutation.CarsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -291,7 +318,23 @@ func (pu *PetUpdate) sqlSave(ctx context.Context) (n int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if nodes := pu.mutation.RemovedFriendsIDs(); len(nodes) > 0 {
+	if pu.mutation.FriendsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   pet.FriendsTable,
+			Columns: pet.FriendsPrimaryKey,
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeString,
+					Column: pet.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := pu.mutation.RemovedFriendsIDs(); len(nodes) > 0 && !pu.mutation.FriendsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: false,
@@ -455,9 +498,15 @@ func (puo *PetUpdateOne) Mutation() *PetMutation {
 	return puo.mutation
 }
 
-// ClearOwner clears the owner edge to User.
+// ClearOwner clears the "owner" edge to type User.
 func (puo *PetUpdateOne) ClearOwner() *PetUpdateOne {
 	puo.mutation.ClearOwner()
+	return puo
+}
+
+// ClearCars clears all "cars" edges to type Car.
+func (puo *PetUpdateOne) ClearCars() *PetUpdateOne {
+	puo.mutation.ClearCars()
 	return puo
 }
 
@@ -476,6 +525,12 @@ func (puo *PetUpdateOne) RemoveCars(c ...*Car) *PetUpdateOne {
 	return puo.RemoveCarIDs(ids...)
 }
 
+// ClearFriends clears all "friends" edges to type Pet.
+func (puo *PetUpdateOne) ClearFriends() *PetUpdateOne {
+	puo.mutation.ClearFriends()
+	return puo
+}
+
 // RemoveFriendIDs removes the friends edge to Pet by ids.
 func (puo *PetUpdateOne) RemoveFriendIDs(ids ...string) *PetUpdateOne {
 	puo.mutation.RemoveFriendIDs(ids...)
@@ -491,7 +546,7 @@ func (puo *PetUpdateOne) RemoveFriends(p ...*Pet) *PetUpdateOne {
 	return puo.RemoveFriendIDs(ids...)
 }
 
-// ClearBestFriend clears the best_friend edge to Pet.
+// ClearBestFriend clears the "best_friend" edge to type Pet.
 func (puo *PetUpdateOne) ClearBestFriend() *PetUpdateOne {
 	puo.mutation.ClearBestFriend()
 	return puo
@@ -499,7 +554,6 @@ func (puo *PetUpdateOne) ClearBestFriend() *PetUpdateOne {
 
 // Save executes the query and returns the updated entity.
 func (puo *PetUpdateOne) Save(ctx context.Context) (*Pet, error) {
-
 	var (
 		err  error
 		node *Pet
@@ -529,11 +583,11 @@ func (puo *PetUpdateOne) Save(ctx context.Context) (*Pet, error) {
 
 // SaveX is like Save, but panics if an error occurs.
 func (puo *PetUpdateOne) SaveX(ctx context.Context) *Pet {
-	pe, err := puo.Save(ctx)
+	node, err := puo.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return pe
+	return node
 }
 
 // Exec executes the query on the entity.
@@ -549,7 +603,7 @@ func (puo *PetUpdateOne) ExecX(ctx context.Context) {
 	}
 }
 
-func (puo *PetUpdateOne) sqlSave(ctx context.Context) (pe *Pet, err error) {
+func (puo *PetUpdateOne) sqlSave(ctx context.Context) (_node *Pet, err error) {
 	_spec := &sqlgraph.UpdateSpec{
 		Node: &sqlgraph.NodeSpec{
 			Table:   pet.Table,
@@ -600,7 +654,23 @@ func (puo *PetUpdateOne) sqlSave(ctx context.Context) (pe *Pet, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if nodes := puo.mutation.RemovedCarsIDs(); len(nodes) > 0 {
+	if puo.mutation.CarsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   pet.CarsTable,
+			Columns: []string{pet.CarsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: car.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := puo.mutation.RemovedCarsIDs(); len(nodes) > 0 && !puo.mutation.CarsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -638,7 +708,23 @@ func (puo *PetUpdateOne) sqlSave(ctx context.Context) (pe *Pet, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	if nodes := puo.mutation.RemovedFriendsIDs(); len(nodes) > 0 {
+	if puo.mutation.FriendsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   pet.FriendsTable,
+			Columns: pet.FriendsPrimaryKey,
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeString,
+					Column: pet.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := puo.mutation.RemovedFriendsIDs(); len(nodes) > 0 && !puo.mutation.FriendsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: false,
@@ -711,9 +797,9 @@ func (puo *PetUpdateOne) sqlSave(ctx context.Context) (pe *Pet, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	pe = &Pet{config: puo.config}
-	_spec.Assign = pe.assignValues
-	_spec.ScanValues = pe.scanValues()
+	_node = &Pet{config: puo.config}
+	_spec.Assign = _node.assignValues
+	_spec.ScanValues = _node.scanValues()
 	if err = sqlgraph.UpdateNode(ctx, puo.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{pet.Label}
@@ -722,5 +808,5 @@ func (puo *PetUpdateOne) sqlSave(ctx context.Context) (pe *Pet, err error) {
 		}
 		return nil, err
 	}
-	return pe, nil
+	return _node, nil
 }

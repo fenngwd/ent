@@ -37,15 +37,31 @@ type (
 		Header string
 		// Storage to support in codegen.
 		Storage *Storage
+
 		// IDType specifies the type of the id field in the codegen.
 		// The supported types are string and int, which also the default.
 		IDType *field.TypeInfo
-		// Template specifies an alternative template to execute or to override
-		// the default. If nil, the default template is used.
+
+		// Template specifies an alternative template to execute or
+		// to override the default. If nil, the default template is used.
+		//
+		// Deprecated: the Template option predates the Templates option and it
+		// is planned be removed in v0.5.0. New code should use Templates instead.
+		Template *template.Template
+
+		// Templates specifies a list of alternative templates to execute or
+		// to override the default. If nil, the default template is used.
 		//
 		// Note that, additional templates are executed on the Graph object and
 		// the execution output is stored in a file derived by the template name.
-		Template *template.Template
+		Templates []*template.Template
+
+		// Funcs specifies external functions to add to the template execution.
+		//
+		// Templates that use custom functions and override (or extend) the default
+		// templates will need to provide the same FuncMap that was used for parsing
+		// the template.
+		Funcs template.FuncMap
 	}
 	// Graph holds the nodes/entities of the loaded graph schema. Note that, it doesn't
 	// hold the edges of the graph. Instead, each Type holds the edges for other Types.
@@ -85,9 +101,10 @@ func NewGraph(c *Config, schemas ...*load.Schema) (g *Graph, err error) {
 func (g *Graph) Gen() (err error) {
 	defer catch(&err)
 	var (
-		written             []string
-		templates, external = g.templates()
+		written  []string
+		external []GraphTemplate
 	)
+	templates, external = g.templates()
 	for _, n := range g.Nodes {
 		path := filepath.Join(g.Config.Target, n.Package())
 		check(os.MkdirAll(path, os.ModePerm), "create dir %q", path)
@@ -402,22 +419,29 @@ func (g *Graph) typ(name string) (*Type, bool) {
 // templates returns the template.Template for the code and external templates
 // to execute on the Graph object if provided.
 func (g *Graph) templates() (*template.Template, []GraphTemplate) {
-	templates = template.Must(templates.Clone())
-	if g.Template == nil {
-		return templates, nil
+	if g.Template != nil {
+		g.Templates = append(g.Templates, g.Template)
 	}
-	external := make([]GraphTemplate, 0)
-	for _, tmpl := range g.Template.Templates() {
-		name := tmpl.Name()
-		// Check that is not defined in the default templates
-		// if it's not the root.
-		if templates.Lookup(name) == nil && !parse.IsEmptyTree(tmpl.Root) && !extendExisting(name) {
-			external = append(external, GraphTemplate{
-				Name:   name,
-				Format: snake(name) + ".go",
-			})
+	templates.Funcs(g.Funcs)
+	external := make([]GraphTemplate, 0, len(g.Templates))
+	for _, rootT := range g.Templates {
+		rootT.Funcs(Funcs)
+		rootT.Funcs(g.Funcs)
+		for _, tmpl := range rootT.Templates() {
+			if parse.IsEmptyTree(tmpl.Root) {
+				continue
+			}
+			name := tmpl.Name()
+			// If this template doesn't override or extend one of the
+			// default templates, generate it in a new file.
+			if templates.Lookup(name) == nil && !extendExisting(name) {
+				external = append(external, GraphTemplate{
+					Name:   name,
+					Format: snake(name) + ".go",
+				})
+			}
+			templates = template.Must(templates.AddParseTree(name, tmpl.Tree))
 		}
-		templates = template.Must(templates.AddParseTree(name, tmpl.Tree))
 	}
 	return templates, external
 }

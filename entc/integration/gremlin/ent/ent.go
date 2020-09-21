@@ -31,7 +31,7 @@ type (
 	MutateFunc = ent.MutateFunc
 )
 
-// OrderFunc applies an ordering on either graph traversal or sql selector.
+// OrderFunc applies an ordering on the graph traversal.
 type OrderFunc func(*dsl.Traversal)
 
 // Asc applies the given fields in ASC order.
@@ -162,7 +162,7 @@ func (e *ValidationError) Error() string {
 
 // Unwrap implements the errors.Wrapper interface.
 func (e *ValidationError) Unwrap() error {
-	return errors.Unwrap(e.err)
+	return e.err
 }
 
 // IsValidationError returns a boolean indicating whether the error is a validaton error.

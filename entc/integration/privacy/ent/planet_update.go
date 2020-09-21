@@ -78,6 +78,12 @@ func (pu *PlanetUpdate) Mutation() *PlanetMutation {
 	return pu.mutation
 }
 
+// ClearNeighbors clears all "neighbors" edges to type Planet.
+func (pu *PlanetUpdate) ClearNeighbors() *PlanetUpdate {
+	pu.mutation.ClearNeighbors()
+	return pu
+}
+
 // RemoveNeighborIDs removes the neighbors edge to Planet by ids.
 func (pu *PlanetUpdate) RemoveNeighborIDs(ids ...int) *PlanetUpdate {
 	pu.mutation.RemoveNeighborIDs(ids...)
@@ -95,7 +101,6 @@ func (pu *PlanetUpdate) RemoveNeighbors(p ...*Planet) *PlanetUpdate {
 
 // Save executes the query and returns the number of rows/vertices matched by this operation.
 func (pu *PlanetUpdate) Save(ctx context.Context) (int, error) {
-
 	var (
 		err      error
 		affected int
@@ -183,7 +188,23 @@ func (pu *PlanetUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Column: planet.FieldAge,
 		})
 	}
-	if nodes := pu.mutation.RemovedNeighborsIDs(); len(nodes) > 0 {
+	if pu.mutation.NeighborsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   planet.NeighborsTable,
+			Columns: planet.NeighborsPrimaryKey,
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: planet.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := pu.mutation.RemovedNeighborsIDs(); len(nodes) > 0 && !pu.mutation.NeighborsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: false,
@@ -286,6 +307,12 @@ func (puo *PlanetUpdateOne) Mutation() *PlanetMutation {
 	return puo.mutation
 }
 
+// ClearNeighbors clears all "neighbors" edges to type Planet.
+func (puo *PlanetUpdateOne) ClearNeighbors() *PlanetUpdateOne {
+	puo.mutation.ClearNeighbors()
+	return puo
+}
+
 // RemoveNeighborIDs removes the neighbors edge to Planet by ids.
 func (puo *PlanetUpdateOne) RemoveNeighborIDs(ids ...int) *PlanetUpdateOne {
 	puo.mutation.RemoveNeighborIDs(ids...)
@@ -303,7 +330,6 @@ func (puo *PlanetUpdateOne) RemoveNeighbors(p ...*Planet) *PlanetUpdateOne {
 
 // Save executes the query and returns the updated entity.
 func (puo *PlanetUpdateOne) Save(ctx context.Context) (*Planet, error) {
-
 	var (
 		err  error
 		node *Planet
@@ -333,11 +359,11 @@ func (puo *PlanetUpdateOne) Save(ctx context.Context) (*Planet, error) {
 
 // SaveX is like Save, but panics if an error occurs.
 func (puo *PlanetUpdateOne) SaveX(ctx context.Context) *Planet {
-	pl, err := puo.Save(ctx)
+	node, err := puo.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return pl
+	return node
 }
 
 // Exec executes the query on the entity.
@@ -353,7 +379,7 @@ func (puo *PlanetUpdateOne) ExecX(ctx context.Context) {
 	}
 }
 
-func (puo *PlanetUpdateOne) sqlSave(ctx context.Context) (pl *Planet, err error) {
+func (puo *PlanetUpdateOne) sqlSave(ctx context.Context) (_node *Planet, err error) {
 	_spec := &sqlgraph.UpdateSpec{
 		Node: &sqlgraph.NodeSpec{
 			Table:   planet.Table,
@@ -389,7 +415,23 @@ func (puo *PlanetUpdateOne) sqlSave(ctx context.Context) (pl *Planet, err error)
 			Column: planet.FieldAge,
 		})
 	}
-	if nodes := puo.mutation.RemovedNeighborsIDs(); len(nodes) > 0 {
+	if puo.mutation.NeighborsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   planet.NeighborsTable,
+			Columns: planet.NeighborsPrimaryKey,
+			Bidi:    true,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: planet.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := puo.mutation.RemovedNeighborsIDs(); len(nodes) > 0 && !puo.mutation.NeighborsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.M2M,
 			Inverse: false,
@@ -427,9 +469,9 @@ func (puo *PlanetUpdateOne) sqlSave(ctx context.Context) (pl *Planet, err error)
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	pl = &Planet{config: puo.config}
-	_spec.Assign = pl.assignValues
-	_spec.ScanValues = pl.scanValues()
+	_node = &Planet{config: puo.config}
+	_spec.Assign = _node.assignValues
+	_spec.ScanValues = _node.scanValues()
 	if err = sqlgraph.UpdateNode(ctx, puo.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{planet.Label}
@@ -438,5 +480,5 @@ func (puo *PlanetUpdateOne) sqlSave(ctx context.Context) (pl *Planet, err error)
 		}
 		return nil, err
 	}
-	return pl, nil
+	return _node, nil
 }

@@ -56,20 +56,23 @@ func (cc *CommentCreate) Mutation() *CommentMutation {
 
 // Save creates the Comment in the database.
 func (cc *CommentCreate) Save(ctx context.Context) (*Comment, error) {
-	if err := cc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *Comment
 	)
 	if len(cc.hooks) == 0 {
+		if err = cc.check(); err != nil {
+			return nil, err
+		}
 		node, err = cc.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*CommentMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = cc.check(); err != nil {
+				return nil, err
 			}
 			cc.mutation = mutation
 			node, err = cc.sqlSave(ctx)
@@ -95,7 +98,8 @@ func (cc *CommentCreate) SaveX(ctx context.Context) *Comment {
 	return v
 }
 
-func (cc *CommentCreate) preSave() error {
+// check runs all checks and user-defined validators on the builder.
+func (cc *CommentCreate) check() error {
 	if _, ok := cc.mutation.UniqueInt(); !ok {
 		return &ValidationError{Name: "unique_int", err: errors.New("ent: missing required field \"unique_int\"")}
 	}
@@ -106,7 +110,7 @@ func (cc *CommentCreate) preSave() error {
 }
 
 func (cc *CommentCreate) sqlSave(ctx context.Context) (*Comment, error) {
-	c, _spec := cc.createSpec()
+	_node, _spec := cc.createSpec()
 	if err := sqlgraph.CreateNode(ctx, cc.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -114,13 +118,13 @@ func (cc *CommentCreate) sqlSave(ctx context.Context) (*Comment, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	c.ID = int(id)
-	return c, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (cc *CommentCreate) createSpec() (*Comment, *sqlgraph.CreateSpec) {
 	var (
-		c     = &Comment{config: cc.config}
+		_node = &Comment{config: cc.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: comment.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -135,7 +139,7 @@ func (cc *CommentCreate) createSpec() (*Comment, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: comment.FieldUniqueInt,
 		})
-		c.UniqueInt = value
+		_node.UniqueInt = value
 	}
 	if value, ok := cc.mutation.UniqueFloat(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -143,7 +147,7 @@ func (cc *CommentCreate) createSpec() (*Comment, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: comment.FieldUniqueFloat,
 		})
-		c.UniqueFloat = value
+		_node.UniqueFloat = value
 	}
 	if value, ok := cc.mutation.NillableInt(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -151,9 +155,9 @@ func (cc *CommentCreate) createSpec() (*Comment, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: comment.FieldNillableInt,
 		})
-		c.NillableInt = &value
+		_node.NillableInt = &value
 	}
-	return c, _spec
+	return _node, _spec
 }
 
 // CommentCreateBulk is the builder for creating a bulk of Comment entities.
@@ -171,12 +175,12 @@ func (ccb *CommentCreateBulk) Save(ctx context.Context) ([]*Comment, error) {
 		func(i int, root context.Context) {
 			builder := ccb.builders[i]
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*CommentMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

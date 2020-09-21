@@ -148,6 +148,21 @@ var (
 	FollowingPrimaryKey = []string{"user_id", "follower_id"}
 )
 
+// ValidColumn reports if the column name is valid (part of the table columns).
+func ValidColumn(column string) bool {
+	for i := range Columns {
+		if column == Columns[i] {
+			return true
+		}
+	}
+	for i := range ForeignKeys {
+		if column == ForeignKeys[i] {
+			return true
+		}
+	}
+	return false
+}
+
 var (
 	// OptionalIntValidator is a validator for the "optional_int" field. It is called by the builders before save.
 	OptionalIntValidator func(int) error
@@ -163,9 +178,9 @@ const DefaultRole = RoleUser
 
 // Role values.
 const (
+	RoleUser     Role = "user"
 	RoleAdmin    Role = "admin"
 	RoleFreeUser Role = "free-user"
-	RoleUser     Role = "user"
 )
 
 func (r Role) String() string {
@@ -175,7 +190,7 @@ func (r Role) String() string {
 // RoleValidator is a validator for the "role" field enum values. It is called by the builders before save.
 func RoleValidator(r Role) error {
 	switch r {
-	case RoleAdmin, RoleFreeUser, RoleUser:
+	case RoleUser, RoleAdmin, RoleFreeUser:
 		return nil
 	default:
 		return fmt.Errorf("user: invalid enum value for role field: %q", r)

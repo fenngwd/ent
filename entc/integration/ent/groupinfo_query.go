@@ -67,8 +67,12 @@ func (giq *GroupInfoQuery) QueryGroups() *GroupQuery {
 		if err := giq.prepareQuery(ctx); err != nil {
 			return nil, err
 		}
+		selector := giq.sqlQuery()
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
 		step := sqlgraph.NewStep(
-			sqlgraph.From(groupinfo.Table, groupinfo.FieldID, giq.sqlQuery()),
+			sqlgraph.From(groupinfo.Table, groupinfo.FieldID, selector),
 			sqlgraph.To(group.Table, group.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, true, groupinfo.GroupsTable, groupinfo.GroupsColumn),
 		)
@@ -80,23 +84,23 @@ func (giq *GroupInfoQuery) QueryGroups() *GroupQuery {
 
 // First returns the first GroupInfo entity in the query. Returns *NotFoundError when no groupinfo was found.
 func (giq *GroupInfoQuery) First(ctx context.Context) (*GroupInfo, error) {
-	gis, err := giq.Limit(1).All(ctx)
+	nodes, err := giq.Limit(1).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(gis) == 0 {
+	if len(nodes) == 0 {
 		return nil, &NotFoundError{groupinfo.Label}
 	}
-	return gis[0], nil
+	return nodes[0], nil
 }
 
 // FirstX is like First, but panics if an error occurs.
 func (giq *GroupInfoQuery) FirstX(ctx context.Context) *GroupInfo {
-	gi, err := giq.First(ctx)
+	node, err := giq.First(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
 	}
-	return gi
+	return node
 }
 
 // FirstID returns the first GroupInfo id in the query. Returns *NotFoundError when no id was found.
@@ -123,13 +127,13 @@ func (giq *GroupInfoQuery) FirstXID(ctx context.Context) int {
 
 // Only returns the only GroupInfo entity in the query, returns an error if not exactly one entity was returned.
 func (giq *GroupInfoQuery) Only(ctx context.Context) (*GroupInfo, error) {
-	gis, err := giq.Limit(2).All(ctx)
+	nodes, err := giq.Limit(2).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	switch len(gis) {
+	switch len(nodes) {
 	case 1:
-		return gis[0], nil
+		return nodes[0], nil
 	case 0:
 		return nil, &NotFoundError{groupinfo.Label}
 	default:
@@ -139,11 +143,11 @@ func (giq *GroupInfoQuery) Only(ctx context.Context) (*GroupInfo, error) {
 
 // OnlyX is like Only, but panics if an error occurs.
 func (giq *GroupInfoQuery) OnlyX(ctx context.Context) *GroupInfo {
-	gi, err := giq.Only(ctx)
+	node, err := giq.Only(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return gi
+	return node
 }
 
 // OnlyID returns the only GroupInfo id in the query, returns an error if not exactly one id was returned.
@@ -182,11 +186,11 @@ func (giq *GroupInfoQuery) All(ctx context.Context) ([]*GroupInfo, error) {
 
 // AllX is like All, but panics if an error occurs.
 func (giq *GroupInfoQuery) AllX(ctx context.Context) []*GroupInfo {
-	gis, err := giq.All(ctx)
+	nodes, err := giq.All(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return gis
+	return nodes
 }
 
 // IDs executes the query and returns a list of GroupInfo ids.
@@ -432,7 +436,7 @@ func (giq *GroupInfoQuery) querySpec() *sqlgraph.QuerySpec {
 	if ps := giq.order; len(ps) > 0 {
 		_spec.Order = func(selector *sql.Selector) {
 			for i := range ps {
-				ps[i](selector)
+				ps[i](selector, groupinfo.ValidColumn)
 			}
 		}
 	}
@@ -451,7 +455,7 @@ func (giq *GroupInfoQuery) sqlQuery() *sql.Selector {
 		p(selector)
 	}
 	for _, p := range giq.order {
-		p(selector)
+		p(selector, groupinfo.ValidColumn)
 	}
 	if offset := giq.offset; offset != nil {
 		// limit is mandatory for offset clause. We start
@@ -686,8 +690,17 @@ func (gigb *GroupInfoGroupBy) BoolX(ctx context.Context) bool {
 }
 
 func (gigb *GroupInfoGroupBy) sqlScan(ctx context.Context, v interface{}) error {
+	for _, f := range gigb.fields {
+		if !groupinfo.ValidColumn(f) {
+			return &ValidationError{Name: f, err: fmt.Errorf("invalid field %q for group-by", f)}
+		}
+	}
+	selector := gigb.sqlQuery()
+	if err := selector.Err(); err != nil {
+		return err
+	}
 	rows := &sql.Rows{}
-	query, args := gigb.sqlQuery().Query()
+	query, args := selector.Query()
 	if err := gigb.driver.Query(ctx, query, args, rows); err != nil {
 		return err
 	}
@@ -700,7 +713,7 @@ func (gigb *GroupInfoGroupBy) sqlQuery() *sql.Selector {
 	columns := make([]string, 0, len(gigb.fields)+len(gigb.fns))
 	columns = append(columns, gigb.fields...)
 	for _, fn := range gigb.fns {
-		columns = append(columns, fn(selector))
+		columns = append(columns, fn(selector, groupinfo.ValidColumn))
 	}
 	return selector.Select(columns...).GroupBy(gigb.fields...)
 }
@@ -920,6 +933,11 @@ func (gis *GroupInfoSelect) BoolX(ctx context.Context) bool {
 }
 
 func (gis *GroupInfoSelect) sqlScan(ctx context.Context, v interface{}) error {
+	for _, f := range gis.fields {
+		if !groupinfo.ValidColumn(f) {
+			return &ValidationError{Name: f, err: fmt.Errorf("invalid field %q for selection", f)}
+		}
+	}
 	rows := &sql.Rows{}
 	query, args := gis.sqlQuery().Query()
 	if err := gis.driver.Query(ctx, query, args, rows); err != nil {

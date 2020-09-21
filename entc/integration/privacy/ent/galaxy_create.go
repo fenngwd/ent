@@ -58,20 +58,23 @@ func (gc *GalaxyCreate) Mutation() *GalaxyMutation {
 
 // Save creates the Galaxy in the database.
 func (gc *GalaxyCreate) Save(ctx context.Context) (*Galaxy, error) {
-	if err := gc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *Galaxy
 	)
 	if len(gc.hooks) == 0 {
+		if err = gc.check(); err != nil {
+			return nil, err
+		}
 		node, err = gc.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*GalaxyMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = gc.check(); err != nil {
+				return nil, err
 			}
 			gc.mutation = mutation
 			node, err = gc.sqlSave(ctx)
@@ -97,7 +100,8 @@ func (gc *GalaxyCreate) SaveX(ctx context.Context) *Galaxy {
 	return v
 }
 
-func (gc *GalaxyCreate) preSave() error {
+// check runs all checks and user-defined validators on the builder.
+func (gc *GalaxyCreate) check() error {
 	if _, ok := gc.mutation.Name(); !ok {
 		return &ValidationError{Name: "name", err: errors.New("ent: missing required field \"name\"")}
 	}
@@ -118,7 +122,7 @@ func (gc *GalaxyCreate) preSave() error {
 }
 
 func (gc *GalaxyCreate) sqlSave(ctx context.Context) (*Galaxy, error) {
-	ga, _spec := gc.createSpec()
+	_node, _spec := gc.createSpec()
 	if err := sqlgraph.CreateNode(ctx, gc.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -126,13 +130,13 @@ func (gc *GalaxyCreate) sqlSave(ctx context.Context) (*Galaxy, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	ga.ID = int(id)
-	return ga, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (gc *GalaxyCreate) createSpec() (*Galaxy, *sqlgraph.CreateSpec) {
 	var (
-		ga    = &Galaxy{config: gc.config}
+		_node = &Galaxy{config: gc.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: galaxy.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -147,7 +151,7 @@ func (gc *GalaxyCreate) createSpec() (*Galaxy, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: galaxy.FieldName,
 		})
-		ga.Name = value
+		_node.Name = value
 	}
 	if value, ok := gc.mutation.GetType(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -155,7 +159,7 @@ func (gc *GalaxyCreate) createSpec() (*Galaxy, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: galaxy.FieldType,
 		})
-		ga.Type = value
+		_node.Type = value
 	}
 	if nodes := gc.mutation.PlanetsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -176,7 +180,7 @@ func (gc *GalaxyCreate) createSpec() (*Galaxy, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	return ga, _spec
+	return _node, _spec
 }
 
 // GalaxyCreateBulk is the builder for creating a bulk of Galaxy entities.
@@ -194,12 +198,12 @@ func (gcb *GalaxyCreateBulk) Save(ctx context.Context) ([]*Galaxy, error) {
 		func(i int, root context.Context) {
 			builder := gcb.builders[i]
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*GalaxyMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

@@ -45,20 +45,23 @@ func (sc *SpecCreate) Mutation() *SpecMutation {
 
 // Save creates the Spec in the database.
 func (sc *SpecCreate) Save(ctx context.Context) (*Spec, error) {
-	if err := sc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *Spec
 	)
 	if len(sc.hooks) == 0 {
+		if err = sc.check(); err != nil {
+			return nil, err
+		}
 		node, err = sc.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*SpecMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = sc.check(); err != nil {
+				return nil, err
 			}
 			sc.mutation = mutation
 			node, err = sc.sqlSave(ctx)
@@ -84,12 +87,13 @@ func (sc *SpecCreate) SaveX(ctx context.Context) *Spec {
 	return v
 }
 
-func (sc *SpecCreate) preSave() error {
+// check runs all checks and user-defined validators on the builder.
+func (sc *SpecCreate) check() error {
 	return nil
 }
 
 func (sc *SpecCreate) sqlSave(ctx context.Context) (*Spec, error) {
-	s, _spec := sc.createSpec()
+	_node, _spec := sc.createSpec()
 	if err := sqlgraph.CreateNode(ctx, sc.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -97,13 +101,13 @@ func (sc *SpecCreate) sqlSave(ctx context.Context) (*Spec, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	s.ID = int(id)
-	return s, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (sc *SpecCreate) createSpec() (*Spec, *sqlgraph.CreateSpec) {
 	var (
-		s     = &Spec{config: sc.config}
+		_node = &Spec{config: sc.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: spec.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -131,7 +135,7 @@ func (sc *SpecCreate) createSpec() (*Spec, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	return s, _spec
+	return _node, _spec
 }
 
 // SpecCreateBulk is the builder for creating a bulk of Spec entities.
@@ -149,12 +153,12 @@ func (scb *SpecCreateBulk) Save(ctx context.Context) ([]*Spec, error) {
 		func(i int, root context.Context) {
 			builder := scb.builders[i]
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*SpecMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

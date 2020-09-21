@@ -5,6 +5,7 @@
 package sql
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"testing"
@@ -1213,6 +1214,26 @@ WHERE
 	OR ("f" <> $10 AND "g" <> $11)`),
 			wantArgs: []interface{}{1, 2, 3, 2, 4, 5, "a", "b", "c", "f", "g"},
 		},
+		{
+			input: Dialect(dialect.Postgres).
+				Select("*").
+				From(Table("test")).
+				Where(P(func(b *Builder) {
+					b.WriteString("nlevel(").Ident("path").WriteByte(')').WriteOp(OpGT).Arg(1)
+				})),
+			wantQuery: `SELECT * FROM "test" WHERE nlevel("path") > $1`,
+			wantArgs:  []interface{}{1},
+		},
+		{
+			input: Dialect(dialect.Postgres).
+				Select("*").
+				From(Table("test")).
+				Where(P(func(b *Builder) {
+					b.WriteString("nlevel(").Ident("path").WriteByte(')').WriteOp(OpGT).Arg(1)
+				})),
+			wantQuery: `SELECT * FROM "test" WHERE nlevel("path") > $1`,
+			wantArgs:  []interface{}{1},
+		},
 	}
 	for i, tt := range tests {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
@@ -1221,4 +1242,13 @@ WHERE
 			require.Equal(t, tt.wantArgs, args)
 		})
 	}
+}
+
+func TestBuilder_Err(t *testing.T) {
+	b := Select("i-")
+	require.NoError(t, b.Err())
+	b.AddError(fmt.Errorf("invalid"))
+	require.EqualError(t, b.Err(), "invalid")
+	b.AddError(fmt.Errorf("unexpected"))
+	require.EqualError(t, b.Err(), "invalid; unexpected")
 }

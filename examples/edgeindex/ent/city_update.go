@@ -58,6 +58,12 @@ func (cu *CityUpdate) Mutation() *CityMutation {
 	return cu.mutation
 }
 
+// ClearStreets clears all "streets" edges to type Street.
+func (cu *CityUpdate) ClearStreets() *CityUpdate {
+	cu.mutation.ClearStreets()
+	return cu
+}
+
 // RemoveStreetIDs removes the streets edge to Street by ids.
 func (cu *CityUpdate) RemoveStreetIDs(ids ...int) *CityUpdate {
 	cu.mutation.RemoveStreetIDs(ids...)
@@ -75,7 +81,6 @@ func (cu *CityUpdate) RemoveStreets(s ...*Street) *CityUpdate {
 
 // Save executes the query and returns the number of rows/vertices matched by this operation.
 func (cu *CityUpdate) Save(ctx context.Context) (int, error) {
-
 	var (
 		err      error
 		affected int
@@ -150,7 +155,23 @@ func (cu *CityUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Column: city.FieldName,
 		})
 	}
-	if nodes := cu.mutation.RemovedStreetsIDs(); len(nodes) > 0 {
+	if cu.mutation.StreetsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   city.StreetsTable,
+			Columns: []string{city.StreetsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: street.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := cu.mutation.RemovedStreetsIDs(); len(nodes) > 0 && !cu.mutation.StreetsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -232,6 +253,12 @@ func (cuo *CityUpdateOne) Mutation() *CityMutation {
 	return cuo.mutation
 }
 
+// ClearStreets clears all "streets" edges to type Street.
+func (cuo *CityUpdateOne) ClearStreets() *CityUpdateOne {
+	cuo.mutation.ClearStreets()
+	return cuo
+}
+
 // RemoveStreetIDs removes the streets edge to Street by ids.
 func (cuo *CityUpdateOne) RemoveStreetIDs(ids ...int) *CityUpdateOne {
 	cuo.mutation.RemoveStreetIDs(ids...)
@@ -249,7 +276,6 @@ func (cuo *CityUpdateOne) RemoveStreets(s ...*Street) *CityUpdateOne {
 
 // Save executes the query and returns the updated entity.
 func (cuo *CityUpdateOne) Save(ctx context.Context) (*City, error) {
-
 	var (
 		err  error
 		node *City
@@ -279,11 +305,11 @@ func (cuo *CityUpdateOne) Save(ctx context.Context) (*City, error) {
 
 // SaveX is like Save, but panics if an error occurs.
 func (cuo *CityUpdateOne) SaveX(ctx context.Context) *City {
-	c, err := cuo.Save(ctx)
+	node, err := cuo.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return c
+	return node
 }
 
 // Exec executes the query on the entity.
@@ -299,7 +325,7 @@ func (cuo *CityUpdateOne) ExecX(ctx context.Context) {
 	}
 }
 
-func (cuo *CityUpdateOne) sqlSave(ctx context.Context) (c *City, err error) {
+func (cuo *CityUpdateOne) sqlSave(ctx context.Context) (_node *City, err error) {
 	_spec := &sqlgraph.UpdateSpec{
 		Node: &sqlgraph.NodeSpec{
 			Table:   city.Table,
@@ -322,7 +348,23 @@ func (cuo *CityUpdateOne) sqlSave(ctx context.Context) (c *City, err error) {
 			Column: city.FieldName,
 		})
 	}
-	if nodes := cuo.mutation.RemovedStreetsIDs(); len(nodes) > 0 {
+	if cuo.mutation.StreetsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   city.StreetsTable,
+			Columns: []string{city.StreetsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: street.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := cuo.mutation.RemovedStreetsIDs(); len(nodes) > 0 && !cuo.mutation.StreetsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -360,9 +402,9 @@ func (cuo *CityUpdateOne) sqlSave(ctx context.Context) (c *City, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	c = &City{config: cuo.config}
-	_spec.Assign = c.assignValues
-	_spec.ScanValues = c.scanValues()
+	_node = &City{config: cuo.config}
+	_spec.Assign = _node.assignValues
+	_spec.ScanValues = _node.scanValues()
 	if err = sqlgraph.UpdateNode(ctx, cuo.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{city.Label}
@@ -371,5 +413,5 @@ func (cuo *CityUpdateOne) sqlSave(ctx context.Context) (c *City, err error) {
 		}
 		return nil, err
 	}
-	return c, nil
+	return _node, nil
 }

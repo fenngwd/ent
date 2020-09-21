@@ -25,6 +25,9 @@ type File func(*dsl.Traversal)
 // FileType is the predicate function for filetype builders.
 type FileType func(*dsl.Traversal)
 
+// Goods is the predicate function for goods builders.
+type Goods func(*dsl.Traversal)
+
 // Group is the predicate function for group builders.
 type Group func(*dsl.Traversal)
 
@@ -42,6 +45,9 @@ type Pet func(*dsl.Traversal)
 
 // Spec is the predicate function for spec builders.
 type Spec func(*dsl.Traversal)
+
+// Task is the predicate function for task builders.
+type Task func(*dsl.Traversal)
 
 // User is the predicate function for user builders.
 type User func(*dsl.Traversal)

@@ -103,13 +103,13 @@ func (nu *NodeUpdate) Mutation() *NodeMutation {
 	return nu.mutation
 }
 
-// ClearPrev clears the prev edge to Node.
+// ClearPrev clears the "prev" edge to type Node.
 func (nu *NodeUpdate) ClearPrev() *NodeUpdate {
 	nu.mutation.ClearPrev()
 	return nu
 }
 
-// ClearNext clears the next edge to Node.
+// ClearNext clears the "next" edge to type Node.
 func (nu *NodeUpdate) ClearNext() *NodeUpdate {
 	nu.mutation.ClearNext()
 	return nu
@@ -117,7 +117,6 @@ func (nu *NodeUpdate) ClearNext() *NodeUpdate {
 
 // Save executes the query and returns the number of rows/vertices matched by this operation.
 func (nu *NodeUpdate) Save(ctx context.Context) (int, error) {
-
 	var (
 		err      error
 		affected int
@@ -322,13 +321,13 @@ func (nuo *NodeUpdateOne) Mutation() *NodeMutation {
 	return nuo.mutation
 }
 
-// ClearPrev clears the prev edge to Node.
+// ClearPrev clears the "prev" edge to type Node.
 func (nuo *NodeUpdateOne) ClearPrev() *NodeUpdateOne {
 	nuo.mutation.ClearPrev()
 	return nuo
 }
 
-// ClearNext clears the next edge to Node.
+// ClearNext clears the "next" edge to type Node.
 func (nuo *NodeUpdateOne) ClearNext() *NodeUpdateOne {
 	nuo.mutation.ClearNext()
 	return nuo
@@ -336,7 +335,6 @@ func (nuo *NodeUpdateOne) ClearNext() *NodeUpdateOne {
 
 // Save executes the query and returns the updated entity.
 func (nuo *NodeUpdateOne) Save(ctx context.Context) (*Node, error) {
-
 	var (
 		err  error
 		node *Node
@@ -366,11 +364,11 @@ func (nuo *NodeUpdateOne) Save(ctx context.Context) (*Node, error) {
 
 // SaveX is like Save, but panics if an error occurs.
 func (nuo *NodeUpdateOne) SaveX(ctx context.Context) *Node {
-	n, err := nuo.Save(ctx)
+	node, err := nuo.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return n
+	return node
 }
 
 // Exec executes the query on the entity.

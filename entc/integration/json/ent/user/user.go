@@ -11,6 +11,8 @@ const (
 	Label = "user"
 	// FieldID holds the string denoting the id field in the database.
 	FieldID = "id"
+	// FieldT holds the string denoting the t field in the database.
+	FieldT = "t"
 	// FieldURL holds the string denoting the url field in the database.
 	FieldURL = "url"
 	// FieldRaw holds the string denoting the raw field in the database.
@@ -31,10 +33,21 @@ const (
 // Columns holds all SQL columns for user fields.
 var Columns = []string{
 	FieldID,
+	FieldT,
 	FieldURL,
 	FieldRaw,
 	FieldDirs,
 	FieldInts,
 	FieldFloats,
 	FieldStrings,
+}
+
+// ValidColumn reports if the column name is valid (part of the table columns).
+func ValidColumn(column string) bool {
+	for i := range Columns {
+		if column == Columns[i] {
+			return true
+		}
+	}
+	return false
 }

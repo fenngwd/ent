@@ -59,23 +59,23 @@ func (ftq *FieldTypeQuery) Order(o ...OrderFunc) *FieldTypeQuery {
 
 // First returns the first FieldType entity in the query. Returns *NotFoundError when no fieldtype was found.
 func (ftq *FieldTypeQuery) First(ctx context.Context) (*FieldType, error) {
-	fts, err := ftq.Limit(1).All(ctx)
+	nodes, err := ftq.Limit(1).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(fts) == 0 {
+	if len(nodes) == 0 {
 		return nil, &NotFoundError{fieldtype.Label}
 	}
-	return fts[0], nil
+	return nodes[0], nil
 }
 
 // FirstX is like First, but panics if an error occurs.
 func (ftq *FieldTypeQuery) FirstX(ctx context.Context) *FieldType {
-	ft, err := ftq.First(ctx)
+	node, err := ftq.First(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
 	}
-	return ft
+	return node
 }
 
 // FirstID returns the first FieldType id in the query. Returns *NotFoundError when no id was found.
@@ -102,13 +102,13 @@ func (ftq *FieldTypeQuery) FirstXID(ctx context.Context) int {
 
 // Only returns the only FieldType entity in the query, returns an error if not exactly one entity was returned.
 func (ftq *FieldTypeQuery) Only(ctx context.Context) (*FieldType, error) {
-	fts, err := ftq.Limit(2).All(ctx)
+	nodes, err := ftq.Limit(2).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	switch len(fts) {
+	switch len(nodes) {
 	case 1:
-		return fts[0], nil
+		return nodes[0], nil
 	case 0:
 		return nil, &NotFoundError{fieldtype.Label}
 	default:
@@ -118,11 +118,11 @@ func (ftq *FieldTypeQuery) Only(ctx context.Context) (*FieldType, error) {
 
 // OnlyX is like Only, but panics if an error occurs.
 func (ftq *FieldTypeQuery) OnlyX(ctx context.Context) *FieldType {
-	ft, err := ftq.Only(ctx)
+	node, err := ftq.Only(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return ft
+	return node
 }
 
 // OnlyID returns the only FieldType id in the query, returns an error if not exactly one id was returned.
@@ -161,11 +161,11 @@ func (ftq *FieldTypeQuery) All(ctx context.Context) ([]*FieldType, error) {
 
 // AllX is like All, but panics if an error occurs.
 func (ftq *FieldTypeQuery) AllX(ctx context.Context) []*FieldType {
-	fts, err := ftq.All(ctx)
+	nodes, err := ftq.All(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return fts
+	return nodes
 }
 
 // IDs executes the query and returns a list of FieldType ids.
@@ -374,7 +374,7 @@ func (ftq *FieldTypeQuery) querySpec() *sqlgraph.QuerySpec {
 	if ps := ftq.order; len(ps) > 0 {
 		_spec.Order = func(selector *sql.Selector) {
 			for i := range ps {
-				ps[i](selector)
+				ps[i](selector, fieldtype.ValidColumn)
 			}
 		}
 	}
@@ -393,7 +393,7 @@ func (ftq *FieldTypeQuery) sqlQuery() *sql.Selector {
 		p(selector)
 	}
 	for _, p := range ftq.order {
-		p(selector)
+		p(selector, fieldtype.ValidColumn)
 	}
 	if offset := ftq.offset; offset != nil {
 		// limit is mandatory for offset clause. We start
@@ -628,8 +628,17 @@ func (ftgb *FieldTypeGroupBy) BoolX(ctx context.Context) bool {
 }
 
 func (ftgb *FieldTypeGroupBy) sqlScan(ctx context.Context, v interface{}) error {
+	for _, f := range ftgb.fields {
+		if !fieldtype.ValidColumn(f) {
+			return &ValidationError{Name: f, err: fmt.Errorf("invalid field %q for group-by", f)}
+		}
+	}
+	selector := ftgb.sqlQuery()
+	if err := selector.Err(); err != nil {
+		return err
+	}
 	rows := &sql.Rows{}
-	query, args := ftgb.sqlQuery().Query()
+	query, args := selector.Query()
 	if err := ftgb.driver.Query(ctx, query, args, rows); err != nil {
 		return err
 	}
@@ -642,7 +651,7 @@ func (ftgb *FieldTypeGroupBy) sqlQuery() *sql.Selector {
 	columns := make([]string, 0, len(ftgb.fields)+len(ftgb.fns))
 	columns = append(columns, ftgb.fields...)
 	for _, fn := range ftgb.fns {
-		columns = append(columns, fn(selector))
+		columns = append(columns, fn(selector, fieldtype.ValidColumn))
 	}
 	return selector.Select(columns...).GroupBy(ftgb.fields...)
 }
@@ -862,6 +871,11 @@ func (fts *FieldTypeSelect) BoolX(ctx context.Context) bool {
 }
 
 func (fts *FieldTypeSelect) sqlScan(ctx context.Context, v interface{}) error {
+	for _, f := range fts.fields {
+		if !fieldtype.ValidColumn(f) {
+			return &ValidationError{Name: f, err: fmt.Errorf("invalid field %q for selection", f)}
+		}
+	}
 	rows := &sql.Rows{}
 	query, args := fts.sqlQuery().Query()
 	if err := fts.driver.Query(ctx, query, args, rows); err != nil {

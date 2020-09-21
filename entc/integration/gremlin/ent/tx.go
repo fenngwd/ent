@@ -26,6 +26,8 @@ type Tx struct {
 	File *FileClient
 	// FileType is the client for interacting with the FileType builders.
 	FileType *FileTypeClient
+	// Goods is the client for interacting with the Goods builders.
+	Goods *GoodsClient
 	// Group is the client for interacting with the Group builders.
 	Group *GroupClient
 	// GroupInfo is the client for interacting with the GroupInfo builders.
@@ -38,6 +40,8 @@ type Tx struct {
 	Pet *PetClient
 	// Spec is the client for interacting with the Spec builders.
 	Spec *SpecClient
+	// Task is the client for interacting with the Task builders.
+	Task *TaskClient
 	// User is the client for interacting with the User builders.
 	User *UserClient
 
@@ -180,12 +184,14 @@ func (tx *Tx) init() {
 	tx.FieldType = NewFieldTypeClient(tx.config)
 	tx.File = NewFileClient(tx.config)
 	tx.FileType = NewFileTypeClient(tx.config)
+	tx.Goods = NewGoodsClient(tx.config)
 	tx.Group = NewGroupClient(tx.config)
 	tx.GroupInfo = NewGroupInfoClient(tx.config)
 	tx.Item = NewItemClient(tx.config)
 	tx.Node = NewNodeClient(tx.config)
 	tx.Pet = NewPetClient(tx.config)
 	tx.Spec = NewSpecClient(tx.config)
+	tx.Task = NewTaskClient(tx.config)
 	tx.User = NewUserClient(tx.config)
 }
 

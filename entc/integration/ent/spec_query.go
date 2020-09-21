@@ -67,8 +67,12 @@ func (sq *SpecQuery) QueryCard() *CardQuery {
 		if err := sq.prepareQuery(ctx); err != nil {
 			return nil, err
 		}
+		selector := sq.sqlQuery()
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
 		step := sqlgraph.NewStep(
-			sqlgraph.From(spec.Table, spec.FieldID, sq.sqlQuery()),
+			sqlgraph.From(spec.Table, spec.FieldID, selector),
 			sqlgraph.To(card.Table, card.FieldID),
 			sqlgraph.Edge(sqlgraph.M2M, false, spec.CardTable, spec.CardPrimaryKey...),
 		)
@@ -80,23 +84,23 @@ func (sq *SpecQuery) QueryCard() *CardQuery {
 
 // First returns the first Spec entity in the query. Returns *NotFoundError when no spec was found.
 func (sq *SpecQuery) First(ctx context.Context) (*Spec, error) {
-	sSlice, err := sq.Limit(1).All(ctx)
+	nodes, err := sq.Limit(1).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if len(sSlice) == 0 {
+	if len(nodes) == 0 {
 		return nil, &NotFoundError{spec.Label}
 	}
-	return sSlice[0], nil
+	return nodes[0], nil
 }
 
 // FirstX is like First, but panics if an error occurs.
 func (sq *SpecQuery) FirstX(ctx context.Context) *Spec {
-	s, err := sq.First(ctx)
+	node, err := sq.First(ctx)
 	if err != nil && !IsNotFound(err) {
 		panic(err)
 	}
-	return s
+	return node
 }
 
 // FirstID returns the first Spec id in the query. Returns *NotFoundError when no id was found.
@@ -123,13 +127,13 @@ func (sq *SpecQuery) FirstXID(ctx context.Context) int {
 
 // Only returns the only Spec entity in the query, returns an error if not exactly one entity was returned.
 func (sq *SpecQuery) Only(ctx context.Context) (*Spec, error) {
-	sSlice, err := sq.Limit(2).All(ctx)
+	nodes, err := sq.Limit(2).All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	switch len(sSlice) {
+	switch len(nodes) {
 	case 1:
-		return sSlice[0], nil
+		return nodes[0], nil
 	case 0:
 		return nil, &NotFoundError{spec.Label}
 	default:
@@ -139,11 +143,11 @@ func (sq *SpecQuery) Only(ctx context.Context) (*Spec, error) {
 
 // OnlyX is like Only, but panics if an error occurs.
 func (sq *SpecQuery) OnlyX(ctx context.Context) *Spec {
-	s, err := sq.Only(ctx)
+	node, err := sq.Only(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return s
+	return node
 }
 
 // OnlyID returns the only Spec id in the query, returns an error if not exactly one id was returned.
@@ -182,11 +186,11 @@ func (sq *SpecQuery) All(ctx context.Context) ([]*Spec, error) {
 
 // AllX is like All, but panics if an error occurs.
 func (sq *SpecQuery) AllX(ctx context.Context) []*Spec {
-	sSlice, err := sq.All(ctx)
+	nodes, err := sq.All(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return sSlice
+	return nodes
 }
 
 // IDs executes the query and returns a list of Spec ids.
@@ -443,7 +447,7 @@ func (sq *SpecQuery) querySpec() *sqlgraph.QuerySpec {
 	if ps := sq.order; len(ps) > 0 {
 		_spec.Order = func(selector *sql.Selector) {
 			for i := range ps {
-				ps[i](selector)
+				ps[i](selector, spec.ValidColumn)
 			}
 		}
 	}
@@ -462,7 +466,7 @@ func (sq *SpecQuery) sqlQuery() *sql.Selector {
 		p(selector)
 	}
 	for _, p := range sq.order {
-		p(selector)
+		p(selector, spec.ValidColumn)
 	}
 	if offset := sq.offset; offset != nil {
 		// limit is mandatory for offset clause. We start
@@ -697,8 +701,17 @@ func (sgb *SpecGroupBy) BoolX(ctx context.Context) bool {
 }
 
 func (sgb *SpecGroupBy) sqlScan(ctx context.Context, v interface{}) error {
+	for _, f := range sgb.fields {
+		if !spec.ValidColumn(f) {
+			return &ValidationError{Name: f, err: fmt.Errorf("invalid field %q for group-by", f)}
+		}
+	}
+	selector := sgb.sqlQuery()
+	if err := selector.Err(); err != nil {
+		return err
+	}
 	rows := &sql.Rows{}
-	query, args := sgb.sqlQuery().Query()
+	query, args := selector.Query()
 	if err := sgb.driver.Query(ctx, query, args, rows); err != nil {
 		return err
 	}
@@ -711,7 +724,7 @@ func (sgb *SpecGroupBy) sqlQuery() *sql.Selector {
 	columns := make([]string, 0, len(sgb.fields)+len(sgb.fns))
 	columns = append(columns, sgb.fields...)
 	for _, fn := range sgb.fns {
-		columns = append(columns, fn(selector))
+		columns = append(columns, fn(selector, spec.ValidColumn))
 	}
 	return selector.Select(columns...).GroupBy(sgb.fields...)
 }
@@ -931,6 +944,11 @@ func (ss *SpecSelect) BoolX(ctx context.Context) bool {
 }
 
 func (ss *SpecSelect) sqlScan(ctx context.Context, v interface{}) error {
+	for _, f := range ss.fields {
+		if !spec.ValidColumn(f) {
+			return &ValidationError{Name: f, err: fmt.Errorf("invalid field %q for selection", f)}
+		}
+	}
 	rows := &sql.Rows{}
 	query, args := ss.sqlQuery().Query()
 	if err := ss.driver.Query(ctx, query, args, rows); err != nil {

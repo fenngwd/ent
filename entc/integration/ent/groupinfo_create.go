@@ -66,20 +66,24 @@ func (gic *GroupInfoCreate) Mutation() *GroupInfoMutation {
 
 // Save creates the GroupInfo in the database.
 func (gic *GroupInfoCreate) Save(ctx context.Context) (*GroupInfo, error) {
-	if err := gic.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *GroupInfo
 	)
+	gic.defaults()
 	if len(gic.hooks) == 0 {
+		if err = gic.check(); err != nil {
+			return nil, err
+		}
 		node, err = gic.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*GroupInfoMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = gic.check(); err != nil {
+				return nil, err
 			}
 			gic.mutation = mutation
 			node, err = gic.sqlSave(ctx)
@@ -105,19 +109,27 @@ func (gic *GroupInfoCreate) SaveX(ctx context.Context) *GroupInfo {
 	return v
 }
 
-func (gic *GroupInfoCreate) preSave() error {
+// defaults sets the default values of the builder before save.
+func (gic *GroupInfoCreate) defaults() {
+	if _, ok := gic.mutation.MaxUsers(); !ok {
+		v := groupinfo.DefaultMaxUsers
+		gic.mutation.SetMaxUsers(v)
+	}
+}
+
+// check runs all checks and user-defined validators on the builder.
+func (gic *GroupInfoCreate) check() error {
 	if _, ok := gic.mutation.Desc(); !ok {
 		return &ValidationError{Name: "desc", err: errors.New("ent: missing required field \"desc\"")}
 	}
 	if _, ok := gic.mutation.MaxUsers(); !ok {
-		v := groupinfo.DefaultMaxUsers
-		gic.mutation.SetMaxUsers(v)
+		return &ValidationError{Name: "max_users", err: errors.New("ent: missing required field \"max_users\"")}
 	}
 	return nil
 }
 
 func (gic *GroupInfoCreate) sqlSave(ctx context.Context) (*GroupInfo, error) {
-	gi, _spec := gic.createSpec()
+	_node, _spec := gic.createSpec()
 	if err := sqlgraph.CreateNode(ctx, gic.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -125,13 +137,13 @@ func (gic *GroupInfoCreate) sqlSave(ctx context.Context) (*GroupInfo, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	gi.ID = int(id)
-	return gi, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (gic *GroupInfoCreate) createSpec() (*GroupInfo, *sqlgraph.CreateSpec) {
 	var (
-		gi    = &GroupInfo{config: gic.config}
+		_node = &GroupInfo{config: gic.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: groupinfo.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -146,7 +158,7 @@ func (gic *GroupInfoCreate) createSpec() (*GroupInfo, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: groupinfo.FieldDesc,
 		})
-		gi.Desc = value
+		_node.Desc = value
 	}
 	if value, ok := gic.mutation.MaxUsers(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -154,7 +166,7 @@ func (gic *GroupInfoCreate) createSpec() (*GroupInfo, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: groupinfo.FieldMaxUsers,
 		})
-		gi.MaxUsers = value
+		_node.MaxUsers = value
 	}
 	if nodes := gic.mutation.GroupsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -175,7 +187,7 @@ func (gic *GroupInfoCreate) createSpec() (*GroupInfo, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	return gi, _spec
+	return _node, _spec
 }
 
 // GroupInfoCreateBulk is the builder for creating a bulk of GroupInfo entities.
@@ -192,13 +204,14 @@ func (gicb *GroupInfoCreateBulk) Save(ctx context.Context) ([]*GroupInfo, error)
 	for i := range gicb.builders {
 		func(i int, root context.Context) {
 			builder := gicb.builders[i]
+			builder.defaults()
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*GroupInfoMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

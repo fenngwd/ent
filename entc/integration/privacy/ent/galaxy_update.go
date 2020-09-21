@@ -64,6 +64,12 @@ func (gu *GalaxyUpdate) Mutation() *GalaxyMutation {
 	return gu.mutation
 }
 
+// ClearPlanets clears all "planets" edges to type Planet.
+func (gu *GalaxyUpdate) ClearPlanets() *GalaxyUpdate {
+	gu.mutation.ClearPlanets()
+	return gu
+}
+
 // RemovePlanetIDs removes the planets edge to Planet by ids.
 func (gu *GalaxyUpdate) RemovePlanetIDs(ids ...int) *GalaxyUpdate {
 	gu.mutation.RemovePlanetIDs(ids...)
@@ -81,28 +87,23 @@ func (gu *GalaxyUpdate) RemovePlanets(p ...*Planet) *GalaxyUpdate {
 
 // Save executes the query and returns the number of rows/vertices matched by this operation.
 func (gu *GalaxyUpdate) Save(ctx context.Context) (int, error) {
-	if v, ok := gu.mutation.Name(); ok {
-		if err := galaxy.NameValidator(v); err != nil {
-			return 0, &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
-		}
-	}
-	if v, ok := gu.mutation.GetType(); ok {
-		if err := galaxy.TypeValidator(v); err != nil {
-			return 0, &ValidationError{Name: "type", err: fmt.Errorf("ent: validator failed for field \"type\": %w", err)}
-		}
-	}
-
 	var (
 		err      error
 		affected int
 	)
 	if len(gu.hooks) == 0 {
+		if err = gu.check(); err != nil {
+			return 0, err
+		}
 		affected, err = gu.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*GalaxyMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = gu.check(); err != nil {
+				return 0, err
 			}
 			gu.mutation = mutation
 			affected, err = gu.sqlSave(ctx)
@@ -141,6 +142,21 @@ func (gu *GalaxyUpdate) ExecX(ctx context.Context) {
 	}
 }
 
+// check runs all checks and user-defined validators on the builder.
+func (gu *GalaxyUpdate) check() error {
+	if v, ok := gu.mutation.Name(); ok {
+		if err := galaxy.NameValidator(v); err != nil {
+			return &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
+		}
+	}
+	if v, ok := gu.mutation.GetType(); ok {
+		if err := galaxy.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf("ent: validator failed for field \"type\": %w", err)}
+		}
+	}
+	return nil
+}
+
 func (gu *GalaxyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 	_spec := &sqlgraph.UpdateSpec{
 		Node: &sqlgraph.NodeSpec{
@@ -173,7 +189,23 @@ func (gu *GalaxyUpdate) sqlSave(ctx context.Context) (n int, err error) {
 			Column: galaxy.FieldType,
 		})
 	}
-	if nodes := gu.mutation.RemovedPlanetsIDs(); len(nodes) > 0 {
+	if gu.mutation.PlanetsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   galaxy.PlanetsTable,
+			Columns: []string{galaxy.PlanetsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: planet.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := gu.mutation.RemovedPlanetsIDs(); len(nodes) > 0 && !gu.mutation.PlanetsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -261,6 +293,12 @@ func (guo *GalaxyUpdateOne) Mutation() *GalaxyMutation {
 	return guo.mutation
 }
 
+// ClearPlanets clears all "planets" edges to type Planet.
+func (guo *GalaxyUpdateOne) ClearPlanets() *GalaxyUpdateOne {
+	guo.mutation.ClearPlanets()
+	return guo
+}
+
 // RemovePlanetIDs removes the planets edge to Planet by ids.
 func (guo *GalaxyUpdateOne) RemovePlanetIDs(ids ...int) *GalaxyUpdateOne {
 	guo.mutation.RemovePlanetIDs(ids...)
@@ -278,28 +316,23 @@ func (guo *GalaxyUpdateOne) RemovePlanets(p ...*Planet) *GalaxyUpdateOne {
 
 // Save executes the query and returns the updated entity.
 func (guo *GalaxyUpdateOne) Save(ctx context.Context) (*Galaxy, error) {
-	if v, ok := guo.mutation.Name(); ok {
-		if err := galaxy.NameValidator(v); err != nil {
-			return nil, &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
-		}
-	}
-	if v, ok := guo.mutation.GetType(); ok {
-		if err := galaxy.TypeValidator(v); err != nil {
-			return nil, &ValidationError{Name: "type", err: fmt.Errorf("ent: validator failed for field \"type\": %w", err)}
-		}
-	}
-
 	var (
 		err  error
 		node *Galaxy
 	)
 	if len(guo.hooks) == 0 {
+		if err = guo.check(); err != nil {
+			return nil, err
+		}
 		node, err = guo.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*GalaxyMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = guo.check(); err != nil {
+				return nil, err
 			}
 			guo.mutation = mutation
 			node, err = guo.sqlSave(ctx)
@@ -318,11 +351,11 @@ func (guo *GalaxyUpdateOne) Save(ctx context.Context) (*Galaxy, error) {
 
 // SaveX is like Save, but panics if an error occurs.
 func (guo *GalaxyUpdateOne) SaveX(ctx context.Context) *Galaxy {
-	ga, err := guo.Save(ctx)
+	node, err := guo.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return ga
+	return node
 }
 
 // Exec executes the query on the entity.
@@ -338,7 +371,22 @@ func (guo *GalaxyUpdateOne) ExecX(ctx context.Context) {
 	}
 }
 
-func (guo *GalaxyUpdateOne) sqlSave(ctx context.Context) (ga *Galaxy, err error) {
+// check runs all checks and user-defined validators on the builder.
+func (guo *GalaxyUpdateOne) check() error {
+	if v, ok := guo.mutation.Name(); ok {
+		if err := galaxy.NameValidator(v); err != nil {
+			return &ValidationError{Name: "name", err: fmt.Errorf("ent: validator failed for field \"name\": %w", err)}
+		}
+	}
+	if v, ok := guo.mutation.GetType(); ok {
+		if err := galaxy.TypeValidator(v); err != nil {
+			return &ValidationError{Name: "type", err: fmt.Errorf("ent: validator failed for field \"type\": %w", err)}
+		}
+	}
+	return nil
+}
+
+func (guo *GalaxyUpdateOne) sqlSave(ctx context.Context) (_node *Galaxy, err error) {
 	_spec := &sqlgraph.UpdateSpec{
 		Node: &sqlgraph.NodeSpec{
 			Table:   galaxy.Table,
@@ -368,7 +416,23 @@ func (guo *GalaxyUpdateOne) sqlSave(ctx context.Context) (ga *Galaxy, err error)
 			Column: galaxy.FieldType,
 		})
 	}
-	if nodes := guo.mutation.RemovedPlanetsIDs(); len(nodes) > 0 {
+	if guo.mutation.PlanetsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   galaxy.PlanetsTable,
+			Columns: []string{galaxy.PlanetsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: &sqlgraph.FieldSpec{
+					Type:   field.TypeInt,
+					Column: planet.FieldID,
+				},
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := guo.mutation.RemovedPlanetsIDs(); len(nodes) > 0 && !guo.mutation.PlanetsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
 			Inverse: false,
@@ -406,9 +470,9 @@ func (guo *GalaxyUpdateOne) sqlSave(ctx context.Context) (ga *Galaxy, err error)
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	ga = &Galaxy{config: guo.config}
-	_spec.Assign = ga.assignValues
-	_spec.ScanValues = ga.scanValues()
+	_node = &Galaxy{config: guo.config}
+	_spec.Assign = _node.assignValues
+	_spec.ScanValues = _node.scanValues()
 	if err = sqlgraph.UpdateNode(ctx, guo.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{galaxy.Label}
@@ -417,5 +481,5 @@ func (guo *GalaxyUpdateOne) sqlSave(ctx context.Context) (ga *Galaxy, err error)
 		}
 		return nil, err
 	}
-	return ga, nil
+	return _node, nil
 }

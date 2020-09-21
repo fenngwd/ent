@@ -62,7 +62,7 @@ func (su *StreetUpdate) Mutation() *StreetMutation {
 	return su.mutation
 }
 
-// ClearCity clears the city edge to City.
+// ClearCity clears the "city" edge to type City.
 func (su *StreetUpdate) ClearCity() *StreetUpdate {
 	su.mutation.ClearCity()
 	return su
@@ -70,7 +70,6 @@ func (su *StreetUpdate) ClearCity() *StreetUpdate {
 
 // Save executes the query and returns the number of rows/vertices matched by this operation.
 func (su *StreetUpdate) Save(ctx context.Context) (int, error) {
-
 	var (
 		err      error
 		affected int
@@ -228,7 +227,7 @@ func (suo *StreetUpdateOne) Mutation() *StreetMutation {
 	return suo.mutation
 }
 
-// ClearCity clears the city edge to City.
+// ClearCity clears the "city" edge to type City.
 func (suo *StreetUpdateOne) ClearCity() *StreetUpdateOne {
 	suo.mutation.ClearCity()
 	return suo
@@ -236,7 +235,6 @@ func (suo *StreetUpdateOne) ClearCity() *StreetUpdateOne {
 
 // Save executes the query and returns the updated entity.
 func (suo *StreetUpdateOne) Save(ctx context.Context) (*Street, error) {
-
 	var (
 		err  error
 		node *Street
@@ -266,11 +264,11 @@ func (suo *StreetUpdateOne) Save(ctx context.Context) (*Street, error) {
 
 // SaveX is like Save, but panics if an error occurs.
 func (suo *StreetUpdateOne) SaveX(ctx context.Context) *Street {
-	s, err := suo.Save(ctx)
+	node, err := suo.Save(ctx)
 	if err != nil {
 		panic(err)
 	}
-	return s
+	return node
 }
 
 // Exec executes the query on the entity.
@@ -286,7 +284,7 @@ func (suo *StreetUpdateOne) ExecX(ctx context.Context) {
 	}
 }
 
-func (suo *StreetUpdateOne) sqlSave(ctx context.Context) (s *Street, err error) {
+func (suo *StreetUpdateOne) sqlSave(ctx context.Context) (_node *Street, err error) {
 	_spec := &sqlgraph.UpdateSpec{
 		Node: &sqlgraph.NodeSpec{
 			Table:   street.Table,
@@ -344,9 +342,9 @@ func (suo *StreetUpdateOne) sqlSave(ctx context.Context) (s *Street, err error) 
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
-	s = &Street{config: suo.config}
-	_spec.Assign = s.assignValues
-	_spec.ScanValues = s.scanValues()
+	_node = &Street{config: suo.config}
+	_spec.Assign = _node.assignValues
+	_spec.ScanValues = _node.scanValues()
 	if err = sqlgraph.UpdateNode(ctx, suo.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{street.Label}
@@ -355,5 +353,5 @@ func (suo *StreetUpdateOne) sqlSave(ctx context.Context) (s *Street, err error) 
 		}
 		return nil, err
 	}
-	return s, nil
+	return _node, nil
 }

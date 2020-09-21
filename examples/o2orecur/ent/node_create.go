@@ -74,20 +74,23 @@ func (nc *NodeCreate) Mutation() *NodeMutation {
 
 // Save creates the Node in the database.
 func (nc *NodeCreate) Save(ctx context.Context) (*Node, error) {
-	if err := nc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *Node
 	)
 	if len(nc.hooks) == 0 {
+		if err = nc.check(); err != nil {
+			return nil, err
+		}
 		node, err = nc.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*NodeMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = nc.check(); err != nil {
+				return nil, err
 			}
 			nc.mutation = mutation
 			node, err = nc.sqlSave(ctx)
@@ -113,7 +116,8 @@ func (nc *NodeCreate) SaveX(ctx context.Context) *Node {
 	return v
 }
 
-func (nc *NodeCreate) preSave() error {
+// check runs all checks and user-defined validators on the builder.
+func (nc *NodeCreate) check() error {
 	if _, ok := nc.mutation.Value(); !ok {
 		return &ValidationError{Name: "value", err: errors.New("ent: missing required field \"value\"")}
 	}
@@ -121,7 +125,7 @@ func (nc *NodeCreate) preSave() error {
 }
 
 func (nc *NodeCreate) sqlSave(ctx context.Context) (*Node, error) {
-	n, _spec := nc.createSpec()
+	_node, _spec := nc.createSpec()
 	if err := sqlgraph.CreateNode(ctx, nc.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -129,13 +133,13 @@ func (nc *NodeCreate) sqlSave(ctx context.Context) (*Node, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	n.ID = int(id)
-	return n, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (nc *NodeCreate) createSpec() (*Node, *sqlgraph.CreateSpec) {
 	var (
-		n     = &Node{config: nc.config}
+		_node = &Node{config: nc.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: node.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -150,7 +154,7 @@ func (nc *NodeCreate) createSpec() (*Node, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: node.FieldValue,
 		})
-		n.Value = value
+		_node.Value = value
 	}
 	if nodes := nc.mutation.PrevIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -190,7 +194,7 @@ func (nc *NodeCreate) createSpec() (*Node, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	return n, _spec
+	return _node, _spec
 }
 
 // NodeCreateBulk is the builder for creating a bulk of Node entities.
@@ -208,12 +212,12 @@ func (ncb *NodeCreateBulk) Save(ctx context.Context) ([]*Node, error) {
 		func(i int, root context.Context) {
 			builder := ncb.builders[i]
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*NodeMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

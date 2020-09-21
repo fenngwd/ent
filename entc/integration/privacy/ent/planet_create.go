@@ -65,20 +65,23 @@ func (pc *PlanetCreate) Mutation() *PlanetMutation {
 
 // Save creates the Planet in the database.
 func (pc *PlanetCreate) Save(ctx context.Context) (*Planet, error) {
-	if err := pc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *Planet
 	)
 	if len(pc.hooks) == 0 {
+		if err = pc.check(); err != nil {
+			return nil, err
+		}
 		node, err = pc.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*PlanetMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = pc.check(); err != nil {
+				return nil, err
 			}
 			pc.mutation = mutation
 			node, err = pc.sqlSave(ctx)
@@ -104,7 +107,8 @@ func (pc *PlanetCreate) SaveX(ctx context.Context) *Planet {
 	return v
 }
 
-func (pc *PlanetCreate) preSave() error {
+// check runs all checks and user-defined validators on the builder.
+func (pc *PlanetCreate) check() error {
 	if _, ok := pc.mutation.Name(); !ok {
 		return &ValidationError{Name: "name", err: errors.New("ent: missing required field \"name\"")}
 	}
@@ -117,7 +121,7 @@ func (pc *PlanetCreate) preSave() error {
 }
 
 func (pc *PlanetCreate) sqlSave(ctx context.Context) (*Planet, error) {
-	pl, _spec := pc.createSpec()
+	_node, _spec := pc.createSpec()
 	if err := sqlgraph.CreateNode(ctx, pc.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -125,13 +129,13 @@ func (pc *PlanetCreate) sqlSave(ctx context.Context) (*Planet, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	pl.ID = int(id)
-	return pl, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (pc *PlanetCreate) createSpec() (*Planet, *sqlgraph.CreateSpec) {
 	var (
-		pl    = &Planet{config: pc.config}
+		_node = &Planet{config: pc.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: planet.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -146,7 +150,7 @@ func (pc *PlanetCreate) createSpec() (*Planet, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: planet.FieldName,
 		})
-		pl.Name = value
+		_node.Name = value
 	}
 	if value, ok := pc.mutation.Age(); ok {
 		_spec.Fields = append(_spec.Fields, &sqlgraph.FieldSpec{
@@ -154,7 +158,7 @@ func (pc *PlanetCreate) createSpec() (*Planet, *sqlgraph.CreateSpec) {
 			Value:  value,
 			Column: planet.FieldAge,
 		})
-		pl.Age = value
+		_node.Age = value
 	}
 	if nodes := pc.mutation.NeighborsIDs(); len(nodes) > 0 {
 		edge := &sqlgraph.EdgeSpec{
@@ -175,7 +179,7 @@ func (pc *PlanetCreate) createSpec() (*Planet, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	return pl, _spec
+	return _node, _spec
 }
 
 // PlanetCreateBulk is the builder for creating a bulk of Planet entities.
@@ -193,12 +197,12 @@ func (pcb *PlanetCreateBulk) Save(ctx context.Context) ([]*Planet, error) {
 		func(i int, root context.Context) {
 			builder := pcb.builders[i]
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*PlanetMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

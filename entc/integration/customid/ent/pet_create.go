@@ -105,20 +105,23 @@ func (pc *PetCreate) Mutation() *PetMutation {
 
 // Save creates the Pet in the database.
 func (pc *PetCreate) Save(ctx context.Context) (*Pet, error) {
-	if err := pc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *Pet
 	)
 	if len(pc.hooks) == 0 {
+		if err = pc.check(); err != nil {
+			return nil, err
+		}
 		node, err = pc.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*PetMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = pc.check(); err != nil {
+				return nil, err
 			}
 			pc.mutation = mutation
 			node, err = pc.sqlSave(ctx)
@@ -144,7 +147,8 @@ func (pc *PetCreate) SaveX(ctx context.Context) *Pet {
 	return v
 }
 
-func (pc *PetCreate) preSave() error {
+// check runs all checks and user-defined validators on the builder.
+func (pc *PetCreate) check() error {
 	if v, ok := pc.mutation.ID(); ok {
 		if err := pet.IDValidator(v); err != nil {
 			return &ValidationError{Name: "id", err: fmt.Errorf("ent: validator failed for field \"id\": %w", err)}
@@ -154,19 +158,19 @@ func (pc *PetCreate) preSave() error {
 }
 
 func (pc *PetCreate) sqlSave(ctx context.Context) (*Pet, error) {
-	pe, _spec := pc.createSpec()
+	_node, _spec := pc.createSpec()
 	if err := sqlgraph.CreateNode(ctx, pc.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
 		}
 		return nil, err
 	}
-	return pe, nil
+	return _node, nil
 }
 
 func (pc *PetCreate) createSpec() (*Pet, *sqlgraph.CreateSpec) {
 	var (
-		pe    = &Pet{config: pc.config}
+		_node = &Pet{config: pc.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: pet.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -176,7 +180,7 @@ func (pc *PetCreate) createSpec() (*Pet, *sqlgraph.CreateSpec) {
 		}
 	)
 	if id, ok := pc.mutation.ID(); ok {
-		pe.ID = id
+		_node.ID = id
 		_spec.ID.Value = id
 	}
 	if nodes := pc.mutation.OwnerIDs(); len(nodes) > 0 {
@@ -255,7 +259,7 @@ func (pc *PetCreate) createSpec() (*Pet, *sqlgraph.CreateSpec) {
 		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
-	return pe, _spec
+	return _node, _spec
 }
 
 // PetCreateBulk is the builder for creating a bulk of Pet entities.
@@ -273,12 +277,12 @@ func (pcb *PetCreateBulk) Save(ctx context.Context) ([]*Pet, error) {
 		func(i int, root context.Context) {
 			builder := pcb.builders[i]
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*PetMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()

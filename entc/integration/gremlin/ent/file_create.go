@@ -76,6 +76,20 @@ func (fc *FileCreate) SetNillableGroup(s *string) *FileCreate {
 	return fc
 }
 
+// SetOp sets the op field.
+func (fc *FileCreate) SetOp(b bool) *FileCreate {
+	fc.mutation.SetOp(b)
+	return fc
+}
+
+// SetNillableOp sets the op field if the given value is not nil.
+func (fc *FileCreate) SetNillableOp(b *bool) *FileCreate {
+	if b != nil {
+		fc.SetOp(*b)
+	}
+	return fc
+}
+
 // SetOwnerID sets the owner edge to User by id.
 func (fc *FileCreate) SetOwnerID(id string) *FileCreate {
 	fc.mutation.SetOwnerID(id)
@@ -136,20 +150,24 @@ func (fc *FileCreate) Mutation() *FileMutation {
 
 // Save creates the File in the database.
 func (fc *FileCreate) Save(ctx context.Context) (*File, error) {
-	if err := fc.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *File
 	)
+	fc.defaults()
 	if len(fc.hooks) == 0 {
+		if err = fc.check(); err != nil {
+			return nil, err
+		}
 		node, err = fc.gremlinSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*FileMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = fc.check(); err != nil {
+				return nil, err
 			}
 			fc.mutation = mutation
 			node, err = fc.gremlinSave(ctx)
@@ -175,10 +193,18 @@ func (fc *FileCreate) SaveX(ctx context.Context) *File {
 	return v
 }
 
-func (fc *FileCreate) preSave() error {
+// defaults sets the default values of the builder before save.
+func (fc *FileCreate) defaults() {
 	if _, ok := fc.mutation.Size(); !ok {
 		v := file.DefaultSize
 		fc.mutation.SetSize(v)
+	}
+}
+
+// check runs all checks and user-defined validators on the builder.
+func (fc *FileCreate) check() error {
+	if _, ok := fc.mutation.Size(); !ok {
+		return &ValidationError{Name: "size", err: errors.New("ent: missing required field \"size\"")}
 	}
 	if v, ok := fc.mutation.Size(); ok {
 		if err := file.SizeValidator(v); err != nil {
@@ -225,6 +251,9 @@ func (fc *FileCreate) gremlin() *dsl.Traversal {
 	}
 	if value, ok := fc.mutation.Group(); ok {
 		v.Property(dsl.Single, file.FieldGroup, value)
+	}
+	if value, ok := fc.mutation.GetOp(); ok {
+		v.Property(dsl.Single, file.FieldOp, value)
 	}
 	for _, id := range fc.mutation.OwnerIDs() {
 		v.AddE(user.FilesLabel).From(g.V(id)).InV()

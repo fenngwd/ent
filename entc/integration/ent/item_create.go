@@ -29,20 +29,23 @@ func (ic *ItemCreate) Mutation() *ItemMutation {
 
 // Save creates the Item in the database.
 func (ic *ItemCreate) Save(ctx context.Context) (*Item, error) {
-	if err := ic.preSave(); err != nil {
-		return nil, err
-	}
 	var (
 		err  error
 		node *Item
 	)
 	if len(ic.hooks) == 0 {
+		if err = ic.check(); err != nil {
+			return nil, err
+		}
 		node, err = ic.sqlSave(ctx)
 	} else {
 		var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
 			mutation, ok := m.(*ItemMutation)
 			if !ok {
 				return nil, fmt.Errorf("unexpected mutation type %T", m)
+			}
+			if err = ic.check(); err != nil {
+				return nil, err
 			}
 			ic.mutation = mutation
 			node, err = ic.sqlSave(ctx)
@@ -68,12 +71,13 @@ func (ic *ItemCreate) SaveX(ctx context.Context) *Item {
 	return v
 }
 
-func (ic *ItemCreate) preSave() error {
+// check runs all checks and user-defined validators on the builder.
+func (ic *ItemCreate) check() error {
 	return nil
 }
 
 func (ic *ItemCreate) sqlSave(ctx context.Context) (*Item, error) {
-	i, _spec := ic.createSpec()
+	_node, _spec := ic.createSpec()
 	if err := sqlgraph.CreateNode(ctx, ic.driver, _spec); err != nil {
 		if cerr, ok := isSQLConstraintError(err); ok {
 			err = cerr
@@ -81,13 +85,13 @@ func (ic *ItemCreate) sqlSave(ctx context.Context) (*Item, error) {
 		return nil, err
 	}
 	id := _spec.ID.Value.(int64)
-	i.ID = int(id)
-	return i, nil
+	_node.ID = int(id)
+	return _node, nil
 }
 
 func (ic *ItemCreate) createSpec() (*Item, *sqlgraph.CreateSpec) {
 	var (
-		i     = &Item{config: ic.config}
+		_node = &Item{config: ic.config}
 		_spec = &sqlgraph.CreateSpec{
 			Table: item.Table,
 			ID: &sqlgraph.FieldSpec{
@@ -96,7 +100,7 @@ func (ic *ItemCreate) createSpec() (*Item, *sqlgraph.CreateSpec) {
 			},
 		}
 	)
-	return i, _spec
+	return _node, _spec
 }
 
 // ItemCreateBulk is the builder for creating a bulk of Item entities.
@@ -114,12 +118,12 @@ func (icb *ItemCreateBulk) Save(ctx context.Context) ([]*Item, error) {
 		func(i int, root context.Context) {
 			builder := icb.builders[i]
 			var mut Mutator = MutateFunc(func(ctx context.Context, m Mutation) (Value, error) {
-				if err := builder.preSave(); err != nil {
-					return nil, err
-				}
 				mutation, ok := m.(*ItemMutation)
 				if !ok {
 					return nil, fmt.Errorf("unexpected mutation type %T", m)
+				}
+				if err := builder.check(); err != nil {
+					return nil, err
 				}
 				builder.mutation = mutation
 				nodes[i], specs[i] = builder.createSpec()
